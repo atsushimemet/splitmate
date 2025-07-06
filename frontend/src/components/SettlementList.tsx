@@ -187,9 +187,9 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
           <div className="bg-gray-50 rounded-lg p-4">
             <h4 className="font-medium text-gray-900 mb-2">承認済み精算明細</h4>
             <div className="space-y-2">
-              {approvedSettlements.map((settlement) => (
+              {approvedSettlements.map((settlement, index) => (
                 <div key={settlement.id} className="flex justify-between text-sm">
-                  <span>精算 #{settlement.id.split('_')[1]}</span>
+                  <span>精算 {index + 1}</span>
                   <span className="font-medium">¥{settlement.settlementAmount.toLocaleString()}</span>
                 </div>
               ))}
@@ -246,7 +246,7 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-2">
                       <h3 className="text-sm font-medium text-gray-900">
-                        精算 #{settlement.id.split('_')[1]}
+                        精算
                       </h3>
                       {getStatusBadge(settlement.status)}
                     </div>
