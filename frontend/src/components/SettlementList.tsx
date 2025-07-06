@@ -87,26 +87,7 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
     return settlements.filter(settlement => settlement.status === 'approved');
   };
 
-  const getTotalSettlementAmount = () => {
-    const approvedSettlements = getApprovedSettlements();
-    
-    // 夫と妻それぞれの未精算金額を計算
-    let husbandUnsettled = 0;
-    let wifeUnsettled = 0;
-    
-    approvedSettlements.forEach(settlement => {
-      if (settlement.payer === 'husband') {
-        // 夫が立替の場合、夫は妻から精算金を受け取る
-        husbandUnsettled += settlement.settlementAmount;
-      } else {
-        // 妻が立替の場合、妻は夫から精算金を受け取る
-        wifeUnsettled += settlement.settlementAmount;
-      }
-    });
-    
-    // 最終的な精算金額は差額
-    return Math.abs(husbandUnsettled - wifeUnsettled);
-  };
+
 
   const getSettlementDirection = () => {
     const approvedSettlements = getApprovedSettlements();
