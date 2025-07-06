@@ -251,7 +251,7 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
                       {getStatusBadge(settlement.status)}
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <span className="text-gray-500">夫の負担額:</span>
                         <span className="ml-2 font-medium text-gray-900">
@@ -262,6 +262,12 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
                         <span className="text-gray-500">妻の負担額:</span>
                         <span className="ml-2 font-medium text-gray-900">
                           ¥{settlement.wifeAmount.toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">合計金額:</span>
+                        <span className="ml-2 font-medium text-gray-900">
+                          ¥{(settlement.husbandAmount + settlement.wifeAmount).toLocaleString()}
                         </span>
                       </div>
                       <div>
