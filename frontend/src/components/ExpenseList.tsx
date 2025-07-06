@@ -22,6 +22,10 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, is
     return new Intl.NumberFormat('ja-JP').format(amount);
   };
 
+  const getPayerName = (payerId: string) => {
+    return payerId === 'husband-001' ? '夫' : '妻';
+  };
+
   if (isLoading) {
     return (
       <div className="card">
@@ -59,7 +63,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, is
                     {expense.category}
                   </span>
                   <span className="text-sm text-gray-500">
-                    {expense.enteredBy === 'husband-001' ? '夫' : '妻'}
+                    {getPayerName(expense.payerId)}
                   </span>
                 </div>
                 

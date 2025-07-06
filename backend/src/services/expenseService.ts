@@ -12,11 +12,11 @@ export class ExpenseService {
       const now = new Date().toISOString();
       
       const sql = `
-        INSERT INTO expenses (id, category, description, amount, entered_by, created_at, updated_at)
+        INSERT INTO expenses (id, category, description, amount, payer_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `;
       
-      db.run(sql, [id, data.category, data.description, data.amount, data.enteredBy, now, now], function(err) {
+      db.run(sql, [id, data.category, data.description, data.amount, data.payerId, now, now], function(err) {
         if (err) {
           resolve({
             success: false,
@@ -50,9 +50,9 @@ export class ExpenseService {
   static async getAllExpenses(): Promise<ApiResponse<Expense[]>> {
     return new Promise((resolve) => {
       const sql = `
-        SELECT e.*, u.name as entered_by_name, u.role as entered_by_role
+        SELECT e.*, u.name as payer_name, u.role as payer_role
         FROM expenses e
-        JOIN users u ON e.entered_by = u.id
+        JOIN users u ON e.payer_id = u.id
         ORDER BY e.created_at DESC
       `;
       
@@ -70,7 +70,7 @@ export class ExpenseService {
           category: row.category,
           description: row.description,
           amount: row.amount,
-          enteredBy: row.entered_by,
+          payerId: row.payer_id,
           createdAt: new Date(row.created_at),
           updatedAt: new Date(row.updated_at)
         }));
@@ -89,9 +89,9 @@ export class ExpenseService {
   static async getExpenseById(id: string): Promise<ApiResponse<Expense>> {
     return new Promise((resolve) => {
       const sql = `
-        SELECT e.*, u.name as entered_by_name, u.role as entered_by_role
+        SELECT e.*, u.name as payer_name, u.role as payer_role
         FROM expenses e
-        JOIN users u ON e.entered_by = u.id
+        JOIN users u ON e.payer_id = u.id
         WHERE e.id = ?
       `;
       
@@ -117,7 +117,7 @@ export class ExpenseService {
           category: row.category,
           description: row.description,
           amount: row.amount,
-          enteredBy: row.entered_by,
+          payerId: row.payer_id,
           createdAt: new Date(row.created_at),
           updatedAt: new Date(row.updated_at)
         };

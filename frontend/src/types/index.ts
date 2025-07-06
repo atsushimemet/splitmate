@@ -3,7 +3,7 @@ export interface Expense {
   category: string;
   description: string;
   amount: number;
-  enteredBy: string;
+  payerId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -12,7 +12,7 @@ export interface CreateExpenseRequest {
   category: string;
   description: string;
   amount: number;
-  enteredBy: string;
+  payerId: string;
 }
 
 export interface ApiResponse<T> {
