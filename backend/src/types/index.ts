@@ -11,7 +11,7 @@ export interface Expense {
   category: string;
   description: string;
   amount: number;
-  enteredBy: string; // User ID
+  payerId: string; // User ID
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,7 +41,7 @@ export interface CreateExpenseRequest {
   category: string;
   description: string;
   amount: number;
-  enteredBy: string;
+  payerId: string;
 }
 
 export interface UpdateAllocationRatioRequest {

@@ -23,10 +23,10 @@ CREATE TABLE IF NOT EXISTS expenses (
   category TEXT NOT NULL,
   description TEXT NOT NULL,
   amount INTEGER NOT NULL CHECK (amount > 0),
-  entered_by TEXT NOT NULL,
+  payer_id TEXT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (entered_by) REFERENCES users(id)
+  FOREIGN KEY (payer_id) REFERENCES users(id)
 );
 
 -- Settlements table
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS settlements (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_expenses_entered_by ON expenses(entered_by);
+CREATE INDEX IF NOT EXISTS idx_expenses_payer_id ON expenses(payer_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at);
 CREATE INDEX IF NOT EXISTS idx_settlements_expense_id ON settlements(expense_id);
 CREATE INDEX IF NOT EXISTS idx_settlements_status ON settlements(status); 

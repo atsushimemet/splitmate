@@ -29,7 +29,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, isLoading = 
     category: '',
     description: '',
     amount: 0,
-    enteredBy: 'husband-001'
+    payerId: 'husband-001'
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -41,7 +41,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, isLoading = 
         category: '',
         description: '',
         amount: 0,
-        enteredBy: formData.enteredBy
+        payerId: formData.payerId
       });
     }
   };
@@ -112,17 +112,19 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, isLoading = 
           />
         </div>
 
-        {/* 入力者選択 */}
+        {/* 立替者選択 */}
         <div>
-          <label htmlFor="enteredBy" className="block text-sm font-medium text-gray-700 mb-2">
-            入力者
+          <label htmlFor="payerId" className="block text-sm font-medium text-gray-700 mb-2">
+            立替者 *
           </label>
           <select
-            id="enteredBy"
-            value={formData.enteredBy}
-            onChange={(e) => handleInputChange('enteredBy', e.target.value)}
+            id="payerId"
+            value={formData.payerId}
+            onChange={(e) => handleInputChange('payerId', e.target.value)}
             className="input-field"
+            required
           >
+            <option value="">立替者を選択してください</option>
             {DEFAULT_USERS.map(user => (
               <option key={user.id} value={user.id}>
                 {user.name}

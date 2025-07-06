@@ -8,7 +8,7 @@ export const settlementService = {
     try {
       // 費用を取得
       const expenseQuery = `
-        SELECT id, category, description, amount, entered_by as enteredBy,
+        SELECT id, category, description, amount, payer_id as payerId,
                created_at as createdAt, updated_at as updatedAt
         FROM expenses 
         WHERE id = ?
@@ -43,10 +43,31 @@ export const settlementService = {
       const husbandAmount = Math.round(expense.amount * ratio.husbandRatio);
       const wifeAmount = Math.round(expense.amount * ratio.wifeRatio);
       
-      // 支払者と受取者を決定（金額の多い方が支払者）
-      const payer = husbandAmount > wifeAmount ? 'husband' : 'wife';
+      // 支払者を取得（入力者から）
+      const userQuery = `
+        SELECT role FROM users WHERE id = ?
+      `;
+      
+      const user = await new Promise<any>((resolve, reject) => {
+        db.get(userQuery, [expense.payerId], (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        });
+      });
+
+      if (!user) {
+        return {
+          success: false,
+          error: '支払者の情報が見つかりません'
+        };
+      }
+
+      // 立替者と受取者を決定（入力者が立替者）
+      const payer = user.role; // 'husband' または 'wife'
       const receiver = payer === 'husband' ? 'wife' : 'husband';
-      const settlementAmount = Math.abs(husbandAmount - wifeAmount);
+      
+      // 精算金額は立替者ではない方の負担金額
+      const settlementAmount = payer === 'husband' ? wifeAmount : husbandAmount;
 
       // 精算レコードを作成または更新
       const now = new Date().toISOString();
@@ -228,6 +249,17 @@ export const settlementService = {
   // 精算一覧を取得
   getAllSettlements: async (): Promise<ApiResponse<Settlement[]>> => {
     try {
+      // 現在の配分比率を取得
+      const ratioResponse = await allocationRatioService.getAllocationRatio();
+      if (!ratioResponse.success || !ratioResponse.data) {
+        return {
+          success: false,
+          error: '配分比率の取得に失敗しました'
+        };
+      }
+
+      const ratio = ratioResponse.data;
+
       const query = `
         SELECT s.id, s.expense_id as expenseId, s.husband_amount as husbandAmount, 
                s.wife_amount as wifeAmount, s.payer, s.receiver, s.settlement_amount as settlementAmount,
@@ -245,18 +277,27 @@ export const settlementService = {
         });
       });
 
-      const settlements = results.map(row => ({
-        id: row.id,
-        expenseId: row.expenseId,
-        husbandAmount: row.husbandAmount,
-        wifeAmount: row.wifeAmount,
-        payer: row.payer,
-        receiver: row.receiver,
-        settlementAmount: row.settlementAmount,
-        status: row.status,
-        createdAt: new Date(row.createdAt),
-        updatedAt: new Date(row.updatedAt)
-      }));
+      // 現在の配分比率で再計算
+      const settlements = results.map(row => {
+        const husbandAmount = Math.round(row.amount * ratio.husbandRatio);
+        const wifeAmount = Math.round(row.amount * ratio.wifeRatio);
+        
+        // 精算金額は立替者ではない方の負担金額
+        const settlementAmount = row.payer === 'husband' ? wifeAmount : husbandAmount;
+
+        return {
+          id: row.id,
+          expenseId: row.expenseId,
+          husbandAmount: husbandAmount,
+          wifeAmount: wifeAmount,
+          payer: row.payer,
+          receiver: row.receiver,
+          settlementAmount: settlementAmount,
+          status: row.status,
+          createdAt: new Date(row.createdAt),
+          updatedAt: new Date(row.updatedAt)
+        };
+      });
 
       return {
         success: true,
