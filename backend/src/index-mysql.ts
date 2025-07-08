@@ -84,10 +84,18 @@ const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NOD
 const frontendUrl = isDevelopment ? 'http://localhost:3000' : 'http://splitmate-alb-906594043.ap-northeast-1.elb.amazonaws.com';
 const backendUrl = isDevelopment ? 'http://localhost:3001' : 'http://splitmate-alb-906594043.ap-northeast-1.elb.amazonaws.com';
 
+console.log('OAuth Configuration:', {
+  NODE_ENV: process.env.NODE_ENV,
+  isDevelopment,
+  frontendUrl,
+  backendUrl,
+  callbackURL: `${backendUrl}/auth/google/callback`
+});
+
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID!,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-  callbackURL: "http://localhost:3001/auth/google/callback",
+  callbackURL: `${backendUrl}/auth/google/callback`,
 },
 (accessToken, refreshToken, profile, done) => {
   console.log('OAuth callback received for user:', profile.displayName);
