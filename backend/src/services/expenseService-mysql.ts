@@ -151,6 +151,38 @@ export class ExpenseService {
   }
 
   /**
+   * 複数の費用を一括削除する
+   */
+  static async bulkDeleteExpenses(ids: string[]): Promise<ApiResponse<{ deletedCount: number }>> {
+    try {
+      if (ids.length === 0) {
+        return {
+          success: false,
+          error: 'No expense IDs provided'
+        };
+      }
+
+      // プレースホルダーを動的に生成
+      const placeholders = ids.map(() => '?').join(',');
+      const sql = `DELETE FROM expenses WHERE id IN (${placeholders})`;
+      
+      const [result] = await pool.execute(sql, ids);
+      const deletedCount = (result as any).affectedRows;
+      
+      return {
+        success: true,
+        data: { deletedCount },
+        message: `${deletedCount} expenses deleted successfully`
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to bulk delete expenses: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
    * 費用の統計情報を取得する
    */
   static async getExpenseStats(): Promise<ApiResponse<any>> {

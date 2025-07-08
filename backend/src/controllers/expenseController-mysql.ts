@@ -10,6 +10,10 @@ const createExpenseSchema = z.object({
   payerId: z.string().min(1, 'Payer ID is required')
 });
 
+const bulkDeleteExpenseSchema = z.object({
+  ids: z.array(z.string().min(1, 'Expense ID is required')).min(1, 'At least one expense ID is required')
+});
+
 export class ExpenseController {
   /**
    * 新しい費用を登録
@@ -146,6 +150,40 @@ export class ExpenseController {
       return;
     } catch (error) {
       console.error('Error fetching expense stats:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+      return;
+    }
+  }
+
+  /**
+   * 複数の費用を一括削除
+   */
+  static async bulkDeleteExpenses(req: Request, res: Response) {
+    try {
+      const validationResult = bulkDeleteExpenseSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: validationResult.error.errors
+        });
+      }
+
+      const { ids } = validationResult.data;
+      const result = await ExpenseService.bulkDeleteExpenses(ids);
+      
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+      return;
+    } catch (error) {
+      console.error('Error bulk deleting expenses:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error'

@@ -109,6 +109,33 @@ const AppContent = () => {
     }
   };
 
+  const handleBulkDeleteExpenses = async (ids: string[]) => {
+    console.log('一括削除対象の費用IDs:', ids);
+    
+    if (ids.length === 0) {
+      setError('削除対象の費用が選択されていません');
+      return;
+    }
+
+    try {
+      const response = await expenseApi.bulkDeleteExpenses(ids);
+      if (response.success) {
+        // 削除された費用をリストから除外
+        setExpenses(prev => prev.filter(expense => !ids.includes(expense.id)));
+        
+        // 統計情報を更新
+        await loadData();
+        
+        // 成功メッセージを表示（オプション）
+        console.log(`${response.data?.deletedCount}件の費用を削除しました`);
+      } else {
+        setError(response.error || '費用の一括削除に失敗しました');
+      }
+    } catch (err) {
+      setError('費用の一括削除に失敗しました');
+    }
+  };
+
   const handleAllocationRatioChange = async (allocationRatio: AllocationRatio) => {
     // 配分比率が変更された時の処理
     console.log('配分比率が変更されました:', allocationRatio);
@@ -232,6 +259,7 @@ const AppContent = () => {
               <ExpenseList 
                 expenses={expenses} 
                 onDelete={handleDeleteExpense} 
+                onBulkDelete={handleBulkDeleteExpenses}
                 isLoading={isLoading} 
               />
             </div>

@@ -55,6 +55,18 @@ export const expenseApi = {
     }
   },
 
+  // 複数の費用を一括削除
+  bulkDeleteExpenses: async (ids: string[]): Promise<ApiResponse<{ deletedCount: number }>> => {
+    try {
+      const response = await api.delete('/expenses/bulk', {
+        data: { ids }
+      });
+      return response.data;
+    } catch (error: any) {
+      return formatError(error, '費用の一括削除に失敗しました');
+    }
+  },
+
   // 統計情報を取得
   getStats: async (): Promise<ApiResponse<ExpenseStats>> => {
     try {
