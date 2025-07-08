@@ -1,3 +1,23 @@
+# Terraform変数の定義
+variable "google_client_id" {
+  description = "Google OAuth Client ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth Client Secret"
+  type        = string
+  sensitive   = true
+}
+
+variable "session_secret" {
+  description = "Session secret for authentication"
+  type        = string
+  sensitive   = true
+  default     = "your-production-session-secret-change-this"
+}
+
 terraform {
   required_providers {
     aws = {
@@ -164,8 +184,8 @@ resource "aws_security_group" "ecs" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    from_port       = 3001
-    to_port         = 3001
+    from_port       = 3000
+    to_port         = 3000
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
@@ -223,7 +243,7 @@ resource "aws_ecs_task_definition" "backend" {
       image = "${aws_ecr_repository.backend.repository_url}:latest"
       portMappings = [
         {
-          containerPort = 3001
+          containerPort = 3000
           protocol      = "tcp"
         }
       ]
@@ -250,11 +270,31 @@ resource "aws_ecs_task_definition" "backend" {
         },
         {
           name  = "PORT"
-          value = "3001"
+          value = "3000"
         },
         {
           name  = "NODE_ENV"
           value = "production"
+        },
+        {
+          name  = "FRONTEND_URL"
+          value = "http://${aws_lb.main.dns_name}"
+        },
+        {
+          name  = "GOOGLE_CLIENT_ID"
+          value = var.google_client_id
+        },
+        {
+          name  = "GOOGLE_CLIENT_SECRET"
+          value = var.google_client_secret
+        },
+        {
+          name  = "GOOGLE_CALLBACK_URL"
+          value = "http://${aws_lb.main.dns_name}/auth/google/callback"
+        },
+        {
+          name  = "SESSION_SECRET"
+          value = var.session_secret
         }
       ]
       logConfiguration = {
@@ -287,7 +327,7 @@ resource "aws_ecs_service" "backend" {
   load_balancer {
     target_group_arn = aws_lb_target_group.backend.arn
     container_name   = "backend"
-    container_port   = 3001
+    container_port   = 3000
   }
 }
 
@@ -350,7 +390,7 @@ resource "aws_security_group" "alb" {
 # Target Group for Backend
 resource "aws_lb_target_group" "backend" {
   name        = "splitmate-backend-tg"
-  port        = 3001
+  port        = 3000
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
@@ -414,6 +454,74 @@ resource "aws_lb_listener_rule" "api" {
   condition {
     path_pattern {
       values = ["/api/*"]
+    }
+  }
+}
+
+# /auth/google と /auth/google/* → backend ルール (Google OAuth認証用)
+resource "aws_lb_listener_rule" "auth_google" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 20
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/auth/google", "/auth/google/*"]
+    }
+  }
+}
+
+# /auth/status → backend ルール (認証状態確認用)
+resource "aws_lb_listener_rule" "auth_status" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 21
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/auth/status"]
+    }
+  }
+}
+
+# /auth/logout → backend ルール (ログアウト用)
+resource "aws_lb_listener_rule" "auth_logout" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 22
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/auth/logout"]
+    }
+  }
+}
+
+# /health → backend ルール (ヘルスチェック用)
+resource "aws_lb_listener_rule" "health" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 30
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/health"]
     }
   }
 }

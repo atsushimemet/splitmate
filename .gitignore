@@ -101,3 +101,12 @@ jspm_packages/
 # Terraform local state and providers
 infra/terraform/.terraform/
 
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Terraform variables with secrets
+terraform.tfvars
+*.tfvars
