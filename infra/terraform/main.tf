@@ -281,6 +281,10 @@ resource "aws_ecs_task_definition" "backend" {
           value = "http://${aws_lb.main.dns_name}"
         },
         {
+          name  = "BACKEND_URL"
+          value = "http://${aws_lb.main.dns_name}"
+        },
+        {
           name  = "GOOGLE_CLIENT_ID"
           value = var.google_client_id
         },
