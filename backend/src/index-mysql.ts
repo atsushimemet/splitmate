@@ -79,13 +79,18 @@ passport.deserializeUser((user: any, done) => {
   done(null, user);
 });
 
+// 開発環境かどうかを判定
+const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+const frontendUrl = isDevelopment ? 'http://localhost:3000' : 'http://splitmate-alb-906594043.ap-northeast-1.elb.amazonaws.com';
+const backendUrl = isDevelopment ? 'http://localhost:3001' : 'http://splitmate-alb-906594043.ap-northeast-1.elb.amazonaws.com';
+
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID!,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-  callbackURL: process.env.GOOGLE_CALLBACK_URL!,
+  callbackURL: "http://localhost:3001/auth/google/callback",
 },
 (accessToken, refreshToken, profile, done) => {
-  // 必要に応じてDB保存など
+  console.log('OAuth callback received for user:', profile.displayName);
   return done(null, profile);
 }
 ));
@@ -98,12 +103,12 @@ app.get('/auth/google', passport.authenticate('google', {
 // Google認証コールバック
 app.get('/auth/google/callback',
   passport.authenticate('google', {
-    failureRedirect: 'http://localhost:3000/',
+    failureRedirect: `${frontendUrl}/`,
     session: true
   }),
   (req, res) => {
     // 認証成功時のリダイレクト先
-    res.redirect('http://localhost:3000/auth/callback');
+    res.redirect(`${frontendUrl}/auth/callback`);
   }
 );
 
