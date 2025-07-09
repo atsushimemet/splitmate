@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import { AllocationRatioForm } from './components/AllocationRatioForm';
 import { AuthCallback } from './components/AuthCallback';
-import { ExpenseForm } from './components/ExpenseForm';
+import ExpenseForm from './components/ExpenseForm';
 import { ExpenseList } from './components/ExpenseList';
 import { ExpenseStats } from './components/ExpenseStats';
 import { GoogleLoginButton } from './components/GoogleLoginButton';
@@ -89,31 +89,42 @@ const AppContent = () => {
     }
   };
 
-  const handleExpenseSubmit = async (expenseData: CreateExpenseRequest) => {
+  const handleExpenseSubmit = useCallback(async (expenseData: CreateExpenseRequest) => {
     setIsSubmitting(true);
     setError(null);
 
     try {
       const response = await expenseApi.createExpense(expenseData);
       if (response.success && response.data) {
-        // 新しい費用をリストに追加
-        setExpenses(prev => [response.data!, ...prev]);
+        const newExpense = response.data;
         
-        // 月次表示中で該当月の費用の場合、月次リストも更新
+        // すべての状態更新を一括で実行（再レンダリングを最小化）
+        setExpenses(prev => [newExpense, ...prev]);
+        
+        // 月次表示中で該当月の費用の場合のみ月次リストも更新
         if (activeTab === 'monthly' && 
-            response.data.expenseYear === selectedYear && 
-            response.data.expenseMonth === selectedMonth) {
-          setMonthlyExpenses(prev => [response.data!, ...prev]);
+            newExpense.expenseYear === selectedYear && 
+            newExpense.expenseMonth === selectedMonth) {
+          setMonthlyExpenses(prev => [newExpense, ...prev]);
         }
         
-        // 統計情報を更新
-        await loadData();
+        // 統計情報をクライアントサイドで更新
+        setStats(prev => ({
+          totalExpenses: prev.totalExpenses + 1,
+          totalAmount: prev.totalAmount + newExpense.amount,
+          averageAmount: (prev.totalAmount + newExpense.amount) / (prev.totalExpenses + 1),
+          minAmount: prev.minAmount === 0 ? newExpense.amount : Math.min(prev.minAmount, newExpense.amount),
+          maxAmount: Math.max(prev.maxAmount, newExpense.amount)
+        }));
         
-        // 精算を自動計算
-        const settlementResponse = await settlementApi.calculateSettlement(response.data.id);
-        if (settlementResponse.success) {
-          console.log('精算が自動計算されました:', settlementResponse.data);
-        }
+        // 精算を自動計算（非同期で実行、状態更新には影響しない）
+        settlementApi.calculateSettlement(newExpense.id).then(settlementResponse => {
+          if (settlementResponse.success) {
+            console.log('精算が自動計算されました:', settlementResponse.data);
+          }
+        }).catch(err => {
+          console.error('精算計算エラー:', err);
+        });
       } else {
         setError(response.error || '費用の作成に失敗しました');
       }
@@ -122,7 +133,7 @@ const AppContent = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [activeTab, selectedYear, selectedMonth]);
 
   const handleDeleteExpense = async (id: string) => {
     if (!confirm('この費用を削除しますか？')) {
@@ -325,7 +336,12 @@ const AppContent = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* 左カラム: 費用入力フォーム */}
             <div className="lg:col-span-1">
-              <ExpenseForm onSubmit={handleExpenseSubmit} isLoading={isSubmitting} />
+              {useMemo(() => (
+                <ExpenseForm 
+                  onSubmit={handleExpenseSubmit} 
+                  isLoading={isSubmitting}
+                />
+              ), [handleExpenseSubmit, isSubmitting])}
             </div>
 
             {/* 右カラム: 統計情報と費用一覧 */}

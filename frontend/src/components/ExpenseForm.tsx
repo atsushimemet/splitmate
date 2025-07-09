@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { forwardRef, memo, useImperativeHandle, useState } from 'react';
 import { CreateExpenseRequest } from '../types';
 
 interface ExpenseFormProps {
   onSubmit: (data: CreateExpenseRequest) => void;
   isLoading?: boolean;
+}
+
+export interface ExpenseFormHandle {
+  resetAmountOnly: () => void;
+  resetAll: () => void;
 }
 
 const EXPENSE_CATEGORIES = [
@@ -49,41 +54,113 @@ const MONTH_OPTIONS = [
   { value: 12, label: '12月' }
 ];
 
-export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, isLoading = false }) => {
+const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit, isLoading = false }, ref) => {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
 
-  const [formData, setFormData] = useState<CreateExpenseRequest>({
-    category: '',
-    description: '',
-    amount: 0,
-    payerId: 'husband-001',
-    expenseYear: currentYear,
-    expenseMonth: currentMonth
-  });
+  // LocalStorageから保存された値を取得（Issue #14対応）
+  const getStoredFormData = (): CreateExpenseRequest => {
+    try {
+      const stored = localStorage.getItem('splitmate-expense-form');
+      if (stored) {
+        const parsedData = JSON.parse(stored);
+        return {
+          category: parsedData.category || '',
+          description: parsedData.description || '',
+          amount: 0, // 金額は常に0からスタート
+          payerId: parsedData.payerId || 'husband-001',
+          expenseYear: parsedData.expenseYear || currentYear,
+          expenseMonth: parsedData.expenseMonth || currentMonth
+        };
+      }
+    } catch (error) {
+      console.warn('Failed to load stored form data:', error);
+    }
+    
+    // デフォルト値
+    return {
+      category: '',
+      description: '',
+      amount: 0,
+      payerId: 'husband-001',
+      expenseYear: currentYear,
+      expenseMonth: currentMonth
+    };
+  };
+
+  const [formData, setFormData] = useState<CreateExpenseRequest>(getStoredFormData);
+
+  // フォームデータの変更時にLocalStorageに保存（金額以外）
+  const saveFormDataToStorage = (data: CreateExpenseRequest) => {
+    try {
+      const dataToStore = {
+        category: data.category,
+        description: data.description,
+        payerId: data.payerId,
+        expenseYear: data.expenseYear,
+        expenseMonth: data.expenseMonth
+        // amount は保存しない
+      };
+      localStorage.setItem('splitmate-expense-form', JSON.stringify(dataToStore));
+    } catch (error) {
+      console.warn('Failed to save form data:', error);
+    }
+  };
+
+  // 外部から呼び出せるメソッドを公開
+  useImperativeHandle(ref, () => ({
+    resetAmountOnly: () => {
+      const newData = { ...formData, amount: 0 };
+      setFormData(newData);
+      saveFormDataToStorage(newData);
+    },
+    resetAll: () => {
+      const clearedData = {
+        category: '',
+        description: '',
+        amount: 0,
+        payerId: 'husband-001',
+        expenseYear: currentYear,
+        expenseMonth: currentMonth
+      };
+      setFormData(clearedData);
+      localStorage.removeItem('splitmate-expense-form');
+    }
+  }), [formData, currentYear, currentMonth]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.category && formData.description && formData.amount > 0) {
       onSubmit(formData);
-      // フォームをリセット（年月と立替者は保持）
-      setFormData({
-        category: '',
-        description: '',
-        amount: 0,
-        payerId: formData.payerId,
-        expenseYear: formData.expenseYear,
-        expenseMonth: formData.expenseMonth
-      });
+      
+      // Issue #14: 金額のみリセット、他のフィールドは保持
+      const newData = { ...formData, amount: 0 };
+      setFormData(newData);
+      saveFormDataToStorage(newData);
     }
   };
 
   const handleInputChange = (field: keyof CreateExpenseRequest, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
+    const newData = {
+      ...formData,
       [field]: value
-    }));
+    };
+    setFormData(newData);
+    saveFormDataToStorage(newData);
+  };
+
+  const handleClearForm = () => {
+    const clearedData = {
+      category: '',
+      description: '',
+      amount: 0,
+      payerId: 'husband-001',
+      expenseYear: currentYear,
+      expenseMonth: currentMonth
+    };
+    setFormData(clearedData);
+    localStorage.removeItem('splitmate-expense-form');
   };
 
   return (
@@ -206,15 +283,28 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, isLoading = 
           </select>
         </div>
 
-        {/* 送信ボタン */}
-        <button
-          type="submit"
-          disabled={isLoading || !formData.category || !formData.description || formData.amount <= 0}
-          className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isLoading ? '送信中...' : '入力完了'}
-        </button>
+        {/* 送信ボタンとクリアボタン */}
+        <div className="space-y-3">
+          <button
+            type="submit"
+            disabled={isLoading || !formData.category || !formData.description || formData.amount <= 0}
+            className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? '送信中...' : '入力完了'}
+          </button>
+          
+          <button
+            type="button"
+            onClick={handleClearForm}
+            className="w-full px-4 py-2 text-sm text-gray-600 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+          >
+            フォームをクリア
+          </button>
+        </div>
       </form>
     </div>
   );
-}; 
+});
+
+export { ExpenseForm as ExpenseFormBase };
+export default memo(ExpenseForm); 
