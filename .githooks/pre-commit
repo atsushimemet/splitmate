@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# =============================================================================
+# Pre-commit Hook: Terraform Security Check
+# =============================================================================
+# This hook prevents accidental commits of sensitive Terraform files
+# To install: cp .githooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -e
+
+echo "🔍 Running pre-commit security checks..."
+
+# Define patterns for sensitive files
+SENSITIVE_PATTERNS=(
+    "terraform.tfstate"
+    "terraform.tfstate.backup" 
+    "terraform.tfstate.*"
+    "*.tfvars"
+    "terraform.tfvars"
+    "*.pem"
+    "*.key"
+    "id_rsa"
+    "id_ed25519"
+    "gcp-key.json"
+    "aws-credentials.json"
+)
+
+# Check staged files
+staged_files=$(git diff --cached --name-only)
+
+if [ -z "$staged_files" ]; then
+    echo "✅ No files staged for commit"
+    exit 0
+fi
+
+echo "📁 Checking staged files for sensitive content..."
+
+# Flag to track if any sensitive files are found
+found_sensitive=false
+
+# Check each staged file against sensitive patterns
+for file in $staged_files; do
+    for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+        if [[ "$file" == *"$pattern"* ]]; then
+            echo "❌ BLOCKED: Sensitive file detected: $file"
+            echo "   Pattern matched: $pattern"
+            found_sensitive=true
+        fi
+    done
+done
+
+# Check for potential secrets in file content
+echo "🔍 Scanning file content for potential secrets..."
+
+for file in $staged_files; do
+    if [ -f "$file" ]; then
+        # Check for common secret patterns
+        if grep -qE "(client_secret|password|private_key|secret_key|access_key)" "$file" 2>/dev/null; then
+            echo "⚠️  WARNING: File $file may contain secrets"
+            echo "   Please review the content carefully"
+        fi
+        
+        # Check for Google OAuth patterns
+        if grep -qE "[0-9]+-[a-zA-Z0-9_]+\.apps\.googleusercontent\.com" "$file" 2>/dev/null; then
+            echo "⚠️  WARNING: File $file contains what appears to be a Google OAuth Client ID"
+        fi
+    fi
+done
+
+# Block commit if sensitive files are found
+if [ "$found_sensitive" = true ]; then
+    echo ""
+    echo "🚫 COMMIT BLOCKED: Sensitive files detected!"
+    echo ""
+    echo "The following file types should NEVER be committed:"
+    echo "  • Terraform state files (*.tfstate, *.tfstate.*)"
+    echo "  • Terraform variables files (*.tfvars)"
+    echo "  • SSH keys (*.pem, *.key, id_rsa*, id_ed25519*)"
+    echo "  • Cloud credentials (gcp-key.json, aws-credentials.json)"
+    echo ""
+    echo "Please remove these files from your commit:"
+    echo "  git reset HEAD <filename>"
+    echo ""
+    echo "Make sure these patterns are in your .gitignore file."
+    echo ""
+    exit 1
+fi
+
+echo "✅ Security check passed - no sensitive files detected"
+echo "" 

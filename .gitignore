@@ -98,15 +98,59 @@ jspm_packages/
 # TypeScript
 *.tsbuildinfo
 
-# Terraform local state and providers
+# =============================================================================
+# TERRAFORM SECURITY CONFIGURATION
+# =============================================================================
+# CRITICAL: These files contain sensitive information and MUST NOT be committed
+
+# Terraform local state and providers (contains downloaded providers)
 infra/terraform/.terraform/
+**/.terraform/
 
-
-# Terraform state files
+# Terraform state files (CONTAINS SECRETS - NEVER COMMIT)
 *.tfstate
 *.tfstate.*
 *.tfstate.backup
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/terraform.tfstate.backup
 
-# Terraform variables with secrets
+# Terraform plan files (may contain sensitive data)
+*.tfplan
+*.tfplan.*
+
+# Terraform variables with secrets (CONTAINS SECRETS - NEVER COMMIT)
 terraform.tfvars
 *.tfvars
+**/terraform.tfvars
+**/*.tfvars
+
+# Terraform CLI configuration files (may contain credentials)
+.terraformrc
+terraform.rc
+
+# =============================================================================
+# ADDITIONAL SECURITY PATTERNS
+# =============================================================================
+
+# SSH keys
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# SSL certificates
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# Cloud provider credentials
+.aws/
+.gcp/
+gcp-key.json
+aws-credentials.json
+
+# Kubernetes secrets
+kubeconfig
+*.kubeconfig

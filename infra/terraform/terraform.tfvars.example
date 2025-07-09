@@ -1,0 +1,29 @@
+# =============================================================================
+# Terraform Variables Template
+# =============================================================================
+# Copy this file to terraform.tfvars and fill in your actual values
+# DO NOT commit terraform.tfvars to version control!
+
+# Google OAuth Configuration
+# Get these from Google Cloud Console > APIs & Services > Credentials
+google_client_id     = "your-google-client-id.apps.googleusercontent.com"
+google_client_secret = "your-google-client-secret"
+
+# Session Secret for Authentication
+# Generate a secure random string for production
+session_secret = "your-secure-session-secret-change-this-in-production"
+
+# =============================================================================
+# Setup Instructions:
+# =============================================================================
+# 1. Copy this file: cp terraform.tfvars.example terraform.tfvars
+# 2. Edit terraform.tfvars with your actual values
+# 3. Never commit terraform.tfvars to git
+# 4. For Google OAuth setup:
+#    - Go to Google Cloud Console
+#    - Enable Google+ API
+#    - Create OAuth 2.0 credentials
+#    - Add authorized redirect URIs:
+#      - http://localhost:3001/auth/google/callback (development)
+#      - http://your-alb-domain/auth/google/callback (production)
+# ============================================================================= 
