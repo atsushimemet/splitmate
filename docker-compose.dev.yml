@@ -46,7 +46,7 @@ services:
       - ./package.json:/app/package.json
       - ./package-lock.json:/app/package-lock.json
     env_file:
-      - ./backend/.env
+      - ./backend/.env.local
     networks:
       - splitmate-network-dev
 
@@ -60,7 +60,7 @@ services:
     environment:
       VITE_API_URL: http://localhost:3001
     ports:
-      - "3000:3000"
+      - "5173:5173"
     depends_on:
       - backend
     volumes:
