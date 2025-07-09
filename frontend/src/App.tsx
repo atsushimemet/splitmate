@@ -16,6 +16,7 @@ import { AllocationRatio, CreateExpenseRequest, Expense, ExpenseStats as Stats }
 const AppContent = () => {
   const { isAuthenticated, loading } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [monthlyExpenses, setMonthlyExpenses] = useState<Expense[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalExpenses: 0,
     totalAmount: 0,
@@ -23,8 +24,11 @@ const AppContent = () => {
     minAmount: 0,
     maxAmount: 0
   });
-  const [activeTab, setActiveTab] = useState<'expenses' | 'allocation' | 'settlements'>('expenses');
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const [activeTab, setActiveTab] = useState<'expenses' | 'monthly' | 'allocation' | 'settlements'>('expenses');
   const [isLoading, setIsLoading] = useState(false);
+  const [isMonthlyLoading, setIsMonthlyLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,8 +36,16 @@ const AppContent = () => {
   useEffect(() => {
     if (isAuthenticated) {
       loadData();
+      loadMonthlyData();
     }
   }, [isAuthenticated]);
+
+  // 選択された年月が変更された時に月次データを再読み込み
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'monthly') {
+      loadMonthlyData();
+    }
+  }, [selectedYear, selectedMonth, isAuthenticated, activeTab]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -60,6 +72,23 @@ const AppContent = () => {
     }
   };
 
+  const loadMonthlyData = async () => {
+    setIsMonthlyLoading(true);
+    setError(null);
+
+    try {
+      // 月次費用一覧を取得
+      const monthlyExpensesResponse = await expenseApi.getExpensesByMonth(selectedYear, selectedMonth);
+      if (monthlyExpensesResponse.success && monthlyExpensesResponse.data) {
+        setMonthlyExpenses(monthlyExpensesResponse.data);
+      }
+    } catch (err) {
+      setError('月次データの取得に失敗しました');
+    } finally {
+      setIsMonthlyLoading(false);
+    }
+  };
+
   const handleExpenseSubmit = async (expenseData: CreateExpenseRequest) => {
     setIsSubmitting(true);
     setError(null);
@@ -69,6 +98,13 @@ const AppContent = () => {
       if (response.success && response.data) {
         // 新しい費用をリストに追加
         setExpenses(prev => [response.data!, ...prev]);
+        
+        // 月次表示中で該当月の費用の場合、月次リストも更新
+        if (activeTab === 'monthly' && 
+            response.data.expenseYear === selectedYear && 
+            response.data.expenseMonth === selectedMonth) {
+          setMonthlyExpenses(prev => [response.data!, ...prev]);
+        }
         
         // 統計情報を更新
         await loadData();
@@ -98,9 +134,13 @@ const AppContent = () => {
       if (response.success) {
         // 削除された費用をリストから除外
         setExpenses(prev => prev.filter(expense => expense.id !== id));
+        setMonthlyExpenses(prev => prev.filter(expense => expense.id !== id));
         
         // 統計情報を更新
         await loadData();
+        if (activeTab === 'monthly') {
+          await loadMonthlyData();
+        }
       } else {
         setError(response.error || '費用の削除に失敗しました');
       }
@@ -122,9 +162,13 @@ const AppContent = () => {
       if (response.success) {
         // 削除された費用をリストから除外
         setExpenses(prev => prev.filter(expense => !ids.includes(expense.id)));
+        setMonthlyExpenses(prev => prev.filter(expense => !ids.includes(expense.id)));
         
         // 統計情報を更新
         await loadData();
+        if (activeTab === 'monthly') {
+          await loadMonthlyData();
+        }
         
         // 成功メッセージを表示（オプション）
         console.log(`${response.data?.deletedCount}件の費用を削除しました`);
@@ -145,15 +189,36 @@ const AppContent = () => {
       // SettlementListコンポーネントに更新を通知
       handleSettlementUpdate();
     }
-    
-    // localStorageを通じてSettlementListコンポーネントに更新通知を送信
-    localStorage.setItem('allocationRatioUpdated', Date.now().toString());
   };
 
   const handleSettlementUpdate = () => {
     // 精算が更新された時の処理
     console.log('精算が更新されました');
   };
+
+  const generateYearOptions = () => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let year = currentYear - 5; year <= currentYear + 1; year++) {
+      years.push(year);
+    }
+    return years;
+  };
+
+  const MONTH_OPTIONS = [
+    { value: 1, label: '1月' },
+    { value: 2, label: '2月' },
+    { value: 3, label: '3月' },
+    { value: 4, label: '4月' },
+    { value: 5, label: '5月' },
+    { value: 6, label: '6月' },
+    { value: 7, label: '7月' },
+    { value: 8, label: '8月' },
+    { value: 9, label: '9月' },
+    { value: 10, label: '10月' },
+    { value: 11, label: '11月' },
+    { value: 12, label: '12月' }
+  ];
 
   // ローディング中の表示
   if (loading) {
@@ -194,6 +259,16 @@ const AppContent = () => {
               費用管理
             </button>
             <button
+              onClick={() => setActiveTab('monthly')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'monthly'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              月次管理
+            </button>
+            <button
               onClick={() => setActiveTab('allocation')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'allocation'
@@ -211,7 +286,7 @@ const AppContent = () => {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              精算一覧
+              精算管理
             </button>
           </nav>
         </div>
@@ -221,7 +296,7 @@ const AppContent = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* エラーメッセージ */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -263,6 +338,60 @@ const AppContent = () => {
                 isLoading={isLoading} 
               />
             </div>
+          </div>
+        )}
+
+        {activeTab === 'monthly' && (
+          <div className="space-y-6">
+            {/* 年月選択 */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold mb-4 text-gray-800">月次費用一覧</h2>
+              <div className="flex items-center gap-4">
+                <div>
+                  <label htmlFor="year-select" className="block text-sm font-medium text-gray-700 mb-2">
+                    年
+                  </label>
+                  <select
+                    id="year-select"
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  >
+                    {generateYearOptions().map(year => (
+                      <option key={year} value={year}>
+                        {year}年
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-2">
+                    月
+                  </label>
+                  <select
+                    id="month-select"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  >
+                    {MONTH_OPTIONS.map(month => (
+                      <option key={month.value} value={month.value}>
+                        {month.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* 月次費用一覧 */}
+            <ExpenseList 
+              expenses={monthlyExpenses} 
+              onDelete={handleDeleteExpense} 
+              onBulkDelete={handleBulkDeleteExpenses}
+              isLoading={isMonthlyLoading}
+              title={`${selectedYear}年${selectedMonth}月の費用一覧`}
+            />
           </div>
         )}
 

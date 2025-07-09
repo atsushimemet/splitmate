@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AllocationRatio, ApiResponse, CreateExpenseRequest, Expense, ExpenseStats, Settlement, UpdateAllocationRatioRequest } from '../types';
+import { AllocationRatio, ApiResponse, CreateExpenseRequest, Expense, ExpenseStats, MonthlyExpenseStats, MonthlyExpenseSummary, Settlement, UpdateAllocationRatioRequest } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -9,6 +9,15 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true, // CORSリクエストでクッキーを送信
+});
+
+// 認証用のベースクライアント（/apiパスを含まない）
+const authApi = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
 });
 
 // エラーレスポンスを整形するヘルパー関数
@@ -42,6 +51,43 @@ export const expenseApi = {
       return response.data;
     } catch (error: any) {
       return formatError(error, '費用の取得に失敗しました');
+    }
+  },
+
+  // 指定した年月の費用を取得
+  getExpensesByMonth: async (year: number, month: number): Promise<ApiResponse<Expense[]>> => {
+    try {
+      const response = await api.get(`/expenses/monthly/${year}/${month}`);
+      return response.data;
+    } catch (error: any) {
+      return formatError(error, '月次費用の取得に失敗しました');
+    }
+  },
+
+  // 指定した年月の費用サマリーを取得
+  getMonthlyExpenseSummary: async (year: number, month: number): Promise<ApiResponse<MonthlyExpenseSummary>> => {
+    try {
+      const response = await api.get(`/expenses/monthly/${year}/${month}/summary`);
+      return response.data;
+    } catch (error: any) {
+      return formatError(error, '月次費用サマリーの取得に失敗しました');
+    }
+  },
+
+  // 月次費用統計情報を取得
+  getMonthlyExpenseStats: async (year?: number, month?: number): Promise<ApiResponse<MonthlyExpenseStats>> => {
+    try {
+      const params = new URLSearchParams();
+      if (year !== undefined) params.append('year', year.toString());
+      if (month !== undefined) params.append('month', month.toString());
+      
+      const queryString = params.toString();
+      const url = queryString ? `/expenses/monthly/stats?${queryString}` : '/expenses/monthly/stats';
+      
+      const response = await api.get(url);
+      return response.data;
+    } catch (error: any) {
+      return formatError(error, '月次費用統計の取得に失敗しました');
     }
   },
 
@@ -138,6 +184,39 @@ export const settlementApi = {
       return response.data;
     } catch (error: any) {
       return formatError(error, '精算の完了に失敗しました');
+    }
+  }
+};
+
+// 認証関連のAPI
+export const auth = {
+  // 認証状態を確認
+  checkAuthStatus: async (): Promise<{ authenticated: boolean; user?: any }> => {
+    try {
+      const response = await authApi.get('/auth/status');
+      return response.data;
+    } catch (error: any) {
+      console.error('Auth status check failed:', error);
+      return { authenticated: false };
+    }
+  },
+
+  // Googleログインページにリダイレクト
+  loginWithGoogle: () => {
+    window.location.href = `${API_BASE_URL}/auth/google`;
+  },
+
+  // ログアウト
+  logout: async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await authApi.get('/auth/logout');
+      return response.data;
+    } catch (error: any) {
+      console.error('Logout failed:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'ログアウトに失敗しました'
+      };
     }
   }
 }; 

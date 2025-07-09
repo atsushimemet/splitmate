@@ -1,4 +1,5 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { auth } from '../services/api';
 
 // ユーザー情報の型定義
 interface User {
@@ -39,11 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const checkAuthStatus = async () => {
     console.log('AuthContext: 認証状態チェックを開始します');
     try {
-      const response = await fetch('http://localhost:3001/auth/status', {
-        credentials: 'include'
-      });
-      console.log('AuthContext: APIレスポンス status:', response.status);
-      const data = await response.json();
+      const data = await auth.checkAuthStatus();
       console.log('AuthContext: APIレスポンス data:', data);
       
       setIsAuthenticated(data.authenticated);
@@ -62,11 +59,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // ログアウト
   const logout = async () => {
     try {
-      await fetch('http://localhost:3001/auth/logout', {
-        credentials: 'include'
-      });
-      setIsAuthenticated(false);
-      setUser(null);
+      const result = await auth.logout();
+      if (result.success) {
+        setIsAuthenticated(false);
+        setUser(null);
+      } else {
+        console.error('Logout failed:', result.error);
+      }
     } catch (error) {
       console.error('Logout failed:', error);
     }

@@ -1,8 +1,9 @@
 import React from 'react';
+import { auth } from '../services/api';
 
 export const GoogleLoginButton: React.FC = () => {
   const handleLogin = () => {
-    window.location.href = 'http://localhost:3001/auth/google';
+    auth.loginWithGoogle();
   };
 
   return (

@@ -108,6 +108,8 @@ async function createIndexes() {
   const indexes = [
     'CREATE INDEX idx_expenses_payer_id ON expenses(payer_id)',
     'CREATE INDEX idx_expenses_created_at ON expenses(created_at)',
+    'CREATE INDEX idx_expenses_monthly ON expenses(expense_year, expense_month)',
+    'CREATE INDEX idx_expenses_monthly_payer ON expenses(expense_year, expense_month, payer_id)',
     'CREATE INDEX idx_settlements_expense_id ON settlements(expense_id)',
     'CREATE INDEX idx_settlements_status ON settlements(status)'
   ];

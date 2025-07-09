@@ -7,11 +7,18 @@ const createExpenseSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   description: z.string().min(1, 'Description is required'),
   amount: z.number().positive('Amount must be positive'),
-  payerId: z.string().min(1, 'Payer ID is required')
+  payerId: z.string().min(1, 'Payer ID is required'),
+  expenseYear: z.number().int().min(2020).max(2099).optional(),
+  expenseMonth: z.number().int().min(1).max(12).optional()
 });
 
 const bulkDeleteExpenseSchema = z.object({
   ids: z.array(z.string().min(1, 'Expense ID is required')).min(1, 'At least one expense ID is required')
+});
+
+const monthlyExpenseSchema = z.object({
+  year: z.number().int().min(2020).max(2099),
+  month: z.number().int().min(1).max(12)
 });
 
 export class ExpenseController {
@@ -63,6 +70,118 @@ export class ExpenseController {
       return;
     } catch (error) {
       console.error('Error fetching expenses:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+      return;
+    }
+  }
+
+  /**
+   * 指定した年月の費用を取得
+   */
+  static async getExpensesByMonth(req: Request, res: Response) {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      
+      const validationResult = monthlyExpenseSchema.safeParse({ year, month });
+      
+      if (!validationResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid year or month',
+          details: validationResult.error.errors
+        });
+      }
+
+      const result = await ExpenseService.getExpensesByMonth(year, month);
+      
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+      return;
+    } catch (error) {
+      console.error('Error fetching monthly expenses:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+      return;
+    }
+  }
+
+  /**
+   * 指定した年月の費用サマリーを取得
+   */
+  static async getMonthlyExpenseSummary(req: Request, res: Response) {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      
+      const validationResult = monthlyExpenseSchema.safeParse({ year, month });
+      
+      if (!validationResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid year or month',
+          details: validationResult.error.errors
+        });
+      }
+
+      const result = await ExpenseService.getMonthlyExpenseSummary(year, month);
+      
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+      return;
+    } catch (error) {
+      console.error('Error fetching monthly expense summary:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+      return;
+    }
+  }
+
+  /**
+   * 月次費用統計情報を取得
+   */
+  static async getMonthlyExpenseStats(req: Request, res: Response) {
+    try {
+      // クエリパラメータから年月を取得（オプション）
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+      
+      // 年月が指定されている場合はバリデーション
+      if (year !== undefined && month !== undefined) {
+        const validationResult = monthlyExpenseSchema.safeParse({ year, month });
+        
+        if (!validationResult.success) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid year or month',
+            details: validationResult.error.errors
+          });
+        }
+      }
+
+      const result = await ExpenseService.getMonthlyExpenseStats(year, month);
+      
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+      return;
+    } catch (error) {
+      console.error('Error fetching monthly expense stats:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error'

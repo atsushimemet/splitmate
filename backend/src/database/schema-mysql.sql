@@ -17,16 +17,20 @@ CREATE TABLE IF NOT EXISTS allocation_ratios (
   CHECK (ABS(husband_ratio + wife_ratio - 1.0) < 0.001)
 );
 
--- Expenses table
+-- Expenses table (with monthly tracking)
 CREATE TABLE IF NOT EXISTS expenses (
   id VARCHAR(255) PRIMARY KEY,
   category VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
   amount INT NOT NULL CHECK (amount > 0),
   payer_id VARCHAR(255) NOT NULL,
+  expense_year INT NOT NULL,
+  expense_month INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (payer_id) REFERENCES users(id) ON DELETE CASCADE
+  FOREIGN KEY (payer_id) REFERENCES users(id) ON DELETE CASCADE,
+  CHECK (expense_year >= 2020 AND expense_year <= 2099),
+  CHECK (expense_month >= 1 AND expense_month <= 12)
 );
 
 -- Settlements table

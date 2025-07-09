@@ -4,6 +4,8 @@ export interface Expense {
   description: string;
   amount: number;
   payerId: string;
+  expenseYear: number;
+  expenseMonth: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -13,6 +15,8 @@ export interface CreateExpenseRequest {
   description: string;
   amount: number;
   payerId: string;
+  expenseYear?: number; // Optional - defaults to current year
+  expenseMonth?: number; // Optional - defaults to current month
 }
 
 export interface ApiResponse<T> {
@@ -62,4 +66,30 @@ export interface Settlement {
   updatedAt: Date;
   expenseDescription?: string;
   expenseAmount?: number;
+}
+
+// Monthly expense specific interfaces
+export interface MonthlyExpenseSummary {
+  year: number;
+  month: number;
+  totalAmount: number;
+  totalExpenses: number;
+  husbandAmount: number;
+  wifeAmount: number;
+  categories: { [category: string]: number };
+}
+
+export interface MonthlyExpenseRequest {
+  year: number;
+  month: number;
+}
+
+export interface MonthlyExpenseStats {
+  currentMonth: MonthlyExpenseSummary;
+  previousMonth: MonthlyExpenseSummary;
+  yearToDate: {
+    totalAmount: number;
+    totalExpenses: number;
+    monthlyAverages: number;
+  };
 } 

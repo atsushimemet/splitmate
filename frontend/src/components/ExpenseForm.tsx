@@ -24,24 +24,57 @@ const DEFAULT_USERS = [
   { id: 'wife-001', name: '妻', role: 'wife' as const }
 ];
 
+// 年月の選択肢を生成
+const generateYearOptions = () => {
+  const currentYear = new Date().getFullYear();
+  const years = [];
+  for (let year = currentYear - 2; year <= currentYear + 1; year++) {
+    years.push(year);
+  }
+  return years;
+};
+
+const MONTH_OPTIONS = [
+  { value: 1, label: '1月' },
+  { value: 2, label: '2月' },
+  { value: 3, label: '3月' },
+  { value: 4, label: '4月' },
+  { value: 5, label: '5月' },
+  { value: 6, label: '6月' },
+  { value: 7, label: '7月' },
+  { value: 8, label: '8月' },
+  { value: 9, label: '9月' },
+  { value: 10, label: '10月' },
+  { value: 11, label: '11月' },
+  { value: 12, label: '12月' }
+];
+
 export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, isLoading = false }) => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
   const [formData, setFormData] = useState<CreateExpenseRequest>({
     category: '',
     description: '',
     amount: 0,
-    payerId: 'husband-001'
+    payerId: 'husband-001',
+    expenseYear: currentYear,
+    expenseMonth: currentMonth
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.category && formData.description && formData.amount > 0) {
       onSubmit(formData);
-      // フォームをリセット
+      // フォームをリセット（年月と立替者は保持）
       setFormData({
         category: '',
         description: '',
         amount: 0,
-        payerId: formData.payerId
+        payerId: formData.payerId,
+        expenseYear: formData.expenseYear,
+        expenseMonth: formData.expenseMonth
       });
     }
   };
@@ -58,6 +91,46 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ onSubmit, isLoading = 
       <h2 className="text-2xl font-bold mb-6 text-gray-800">費用入力</h2>
       
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* 年月選択 */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="expenseYear" className="block text-sm font-medium text-gray-700 mb-2">
+              年 *
+            </label>
+            <select
+              id="expenseYear"
+              value={formData.expenseYear}
+              onChange={(e) => handleInputChange('expenseYear', parseInt(e.target.value))}
+              className="input-field"
+              required
+            >
+              {generateYearOptions().map(year => (
+                <option key={year} value={year}>
+                  {year}年
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="expenseMonth" className="block text-sm font-medium text-gray-700 mb-2">
+              月 *
+            </label>
+            <select
+              id="expenseMonth"
+              value={formData.expenseMonth}
+              onChange={(e) => handleInputChange('expenseMonth', parseInt(e.target.value))}
+              className="input-field"
+              required
+            >
+              {MONTH_OPTIONS.map(month => (
+                <option key={month.value} value={month.value}>
+                  {month.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {/* カテゴリ選択 */}
         <div>
           <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">

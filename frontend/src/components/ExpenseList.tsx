@@ -6,11 +6,19 @@ interface ExpenseListProps {
   onDelete: (id: string) => void;
   onBulkDelete: (ids: string[]) => void;
   isLoading?: boolean;
+  title?: string; // タイトルをカスタマイズできるように
 }
 
-export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, onBulkDelete, isLoading = false }) => {
+export const ExpenseList: React.FC<ExpenseListProps> = ({ 
+  expenses, 
+  onDelete, 
+  onBulkDelete, 
+  isLoading = false,
+  title = "費用一覧"
+}) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString('ja-JP', {
       year: 'numeric',
@@ -27,6 +35,10 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
 
   const getPayerName = (payerId: string) => {
     return payerId === 'husband-001' ? '夫' : '妻';
+  };
+
+  const formatMonthYear = (year: number, month: number) => {
+    return `${year}年${month}月`;
   };
 
   // チェックボックスの制御
@@ -63,7 +75,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
   if (isLoading) {
     return (
       <div className="card">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">費用一覧</h2>
+        <h2 className="text-2xl font-bold mb-6 text-gray-800">{title}</h2>
         <div className="flex justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
         </div>
@@ -74,7 +86,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
   if (expenses.length === 0) {
     return (
       <div className="card">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">費用一覧</h2>
+        <h2 className="text-2xl font-bold mb-6 text-gray-800">{title}</h2>
         <div className="text-center py-8 text-gray-500">
           <p>まだ費用が登録されていません</p>
           <p className="text-sm mt-2">費用を入力してください</p>
@@ -86,7 +98,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
   return (
     <div className="card">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">費用一覧</h2>
+        <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
         
         {/* 一括削除コントロール */}
         <div className="flex items-center gap-4">
@@ -128,26 +140,30 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
                   onChange={(e) => handleSelectExpense(expense.id, e.target.checked)}
                   className="mt-1 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                 />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded-full">
-                        {expense.category}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {getPayerName(expense.payerId)}
-                      </span>
-                    </div>
-                    
-                    <h3 className="font-medium text-gray-900 mb-1">
-                      {expense.description}
-                    </h3>
-                    
-                    <p className="text-sm text-gray-500">
-                      {formatDate(expense.createdAt)}
-                    </p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="inline-block bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded-full">
+                      {expense.category}
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      {getPayerName(expense.payerId)}
+                    </span>
+                    {/* 月次情報を表示 */}
+                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                      {formatMonthYear(expense.expenseYear, expense.expenseMonth)}
+                    </span>
                   </div>
+                  
+                  <h3 className="font-medium text-gray-900 mb-1">
+                    {expense.description}
+                  </h3>
+                  
+                  <p className="text-sm text-gray-500">
+                    {formatDate(expense.createdAt)}
+                  </p>
                 </div>
-              
+              </div>
+            
               <div className="flex items-center gap-3">
                 <span className="text-lg font-bold text-gray-900">
                   ¥{formatAmount(expense.amount)}
@@ -163,38 +179,38 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ expenses, onDelete, on
               </div>
             </div>
           </div>
-                  ))}
-        </div>
+        ))}
+      </div>
 
-        {/* 確認ダイアログ */}
-        {showConfirmDialog && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                費用の一括削除
-              </h3>
-              <p className="text-gray-600 mb-6">
-                選択した{selectedIds.length}件の費用を削除しますか？
-                <br />
-                この操作は取り消せません。
-              </p>
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => setShowConfirmDialog(false)}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  キャンセル
-                </button>
-                <button
-                  onClick={confirmBulkDelete}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  削除する
-                </button>
-              </div>
+      {/* 確認ダイアログ */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              費用の一括削除
+            </h3>
+            <p className="text-gray-600 mb-6">
+              選択した{selectedIds.length}件の費用を削除しますか？
+              <br />
+              この操作は取り消せません。
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowConfirmDialog(false)}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={confirmBulkDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                削除する
+              </button>
             </div>
           </div>
-        )}
-      </div>
-    );
-  }; 
+        </div>
+      )}
+    </div>
+  );
+}; 

@@ -32,21 +32,27 @@ services:
     container_name: splitmate-backend-dev
     restart: unless-stopped
     environment:
-      DB_HOST: splitmate-mysql.cbouy0i4ou8r.ap-northeast-1.rds.amazonaws.com
+      DB_HOST: mysql
       DB_USER: splitmate_user
-      DB_PASSWORD: splitmate-rds
+      DB_PASSWORD: splitmate_password
       DB_NAME: splitmate
       DB_PORT: 3306
       PORT: 3001
       NODE_ENV: development
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      FRONTEND_URL: http://localhost:5173
+      BACKEND_URL: http://localhost:3001
+      SESSION_SECRET: ${SESSION_SECRET:-your-default-session-secret}
     ports:
       - "3001:3001"
     volumes:
       - ./backend:/app/backend
       - ./package.json:/app/package.json
       - ./package-lock.json:/app/package-lock.json
-    env_file:
-      - ./backend/.env.local
+    depends_on:
+      mysql:
+        condition: service_healthy
     networks:
       - splitmate-network-dev
 
