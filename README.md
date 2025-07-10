@@ -66,3 +66,54 @@ You can adjust z (reminder interval) from this message.
 | Reminder Frequency (z) | Every 1 day              |
 
 Both parties will be informed about the reminder interval (z) the first time and can change it.
+
+## AWS Resource Management
+
+This project includes scripts to manage AWS resources efficiently, allowing you to start and stop infrastructure components to optimize costs.
+
+### Available Scripts
+
+#### Stop AWS Resources
+```bash
+./scripts/stop-aws-resources.sh
+```
+- **Purpose**: Stop AWS resources to reduce costs while preserving data
+- **Targets**: ECS Services, RDS Instance (keeps data for restart)
+- **Features**: 
+  - Lists all running resources numerically
+  - User confirmation prompt ("停止してOKですか?" y/N)
+  - Error handling with success/failure reporting
+  - Preserves database data for restart capability
+
+#### Start AWS Resources
+```bash
+./scripts/start-aws-resources.sh
+```
+- **Purpose**: Start stopped AWS resources to restore application functionality
+- **Targets**: RDS Instance, ECS Services
+- **Features**:
+  - Lists all startable resources numerically
+  - User confirmation prompt ("開始してOKですか?" y/N)
+  - Error handling with success/failure reporting
+  - Automatic RDS availability waiting
+  - Displays application URL upon successful completion
+
+### Resource Types Managed
+1. **ECS Cluster**: `splitmate-cluster`
+2. **ECS Services**: 
+   - Backend Service: `splitmate-backend-service`
+   - Frontend Service: `splitmate-frontend-service`
+3. **RDS Instance**: `splitmate-mysql` (data preserved during stop/start)
+4. **Application Load Balancer**: `splitmate-alb` (always active)
+5. **ECR Repositories**: `splitmate-backend`, `splitmate-frontend` (always available)
+
+### Prerequisites
+- AWS CLI installed and configured
+- Appropriate AWS permissions for ECS, RDS, and ELB operations
+- Resources must be deployed via Terraform first
+
+### Usage Notes
+- **Data Safety**: Database data is preserved during stop/start operations
+- **Startup Order**: RDS starts first, then ECS services (recommended)
+- **Cost Optimization**: Only compute resources (ECS, RDS) are stopped; storage and networking remain
+- **Availability**: Application typically takes 2-5 minutes to become fully operational after start
