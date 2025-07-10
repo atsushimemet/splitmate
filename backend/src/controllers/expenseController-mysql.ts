@@ -21,6 +21,14 @@ const monthlyExpenseSchema = z.object({
   month: z.number().int().min(1).max(12)
 });
 
+const updateExpenseAllocationRatioSchema = z.object({
+  customHusbandRatio: z.number().min(0).max(1, 'Husband ratio must be between 0 and 1'),
+  customWifeRatio: z.number().min(0).max(1, 'Wife ratio must be between 0 and 1'),
+  usesCustomRatio: z.boolean()
+}).refine((data) => Math.abs(data.customHusbandRatio + data.customWifeRatio - 1) < 0.001, {
+  message: 'Husband and wife ratios must sum to 1'
+});
+
 export class ExpenseController {
   /**
    * 新しい費用を登録
@@ -292,8 +300,7 @@ export class ExpenseController {
         });
       }
 
-      const { ids } = validationResult.data;
-      const result = await ExpenseService.bulkDeleteExpenses(ids);
+      const result = await ExpenseService.bulkDeleteExpenses(validationResult.data.ids);
       
       if (result.success) {
         res.status(200).json(result);
@@ -303,6 +310,48 @@ export class ExpenseController {
       return;
     } catch (error) {
       console.error('Error bulk deleting expenses:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+      return;
+    }
+  }
+
+  /**
+   * 費用の個別配分比率を更新
+   */
+  static async updateExpenseAllocationRatio(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          error: 'Expense ID is required'
+        });
+      }
+
+      const validationResult = updateExpenseAllocationRatioSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: validationResult.error.errors
+        });
+      }
+
+      const result = await ExpenseService.updateExpenseAllocationRatio(id, validationResult.data);
+      
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+      return;
+    } catch (error) {
+      console.error('Error updating expense allocation ratio:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error'

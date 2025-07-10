@@ -14,6 +14,10 @@ export interface Expense {
   payerId: string; // User ID
   expenseYear: number;
   expenseMonth: number;
+  // Custom allocation ratio fields
+  customHusbandRatio?: number | null;
+  customWifeRatio?: number | null;
+  usesCustomRatio: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +50,16 @@ export interface CreateExpenseRequest {
   payerId: string;
   expenseYear?: number; // Optional - defaults to current year
   expenseMonth?: number; // Optional - defaults to current month
+  // Custom allocation ratio fields
+  customHusbandRatio?: number;
+  customWifeRatio?: number;
+  usesCustomRatio?: boolean;
+}
+
+export interface UpdateExpenseAllocationRatioRequest {
+  customHusbandRatio: number;
+  customWifeRatio: number;
+  usesCustomRatio: boolean;
 }
 
 export interface UpdateAllocationRatioRequest {

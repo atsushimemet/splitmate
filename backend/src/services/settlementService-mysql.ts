@@ -6,9 +6,12 @@ export const settlementService = {
   // 費用の精算を計算
   calculateSettlement: async (expenseId: string): Promise<ApiResponse<Settlement>> => {
     try {
-      // 費用を取得
+      // 費用を取得（個別配分比率を含む）
       const expenseQuery = `
         SELECT id, category, description, amount, payer_id as payerId,
+               custom_husband_ratio as customHusbandRatio,
+               custom_wife_ratio as customWifeRatio,
+               uses_custom_ratio as usesCustomRatio,
                created_at as createdAt, updated_at as updatedAt
         FROM expenses 
         WHERE id = ?
@@ -24,20 +27,30 @@ export const settlementService = {
         };
       }
 
-      // 配分比率を取得
-      const ratioResponse = await allocationRatioService.getAllocationRatio();
-      if (!ratioResponse.success || !ratioResponse.data) {
-        return {
-          success: false,
-          error: '配分比率の取得に失敗しました'
-        };
-      }
+      // 配分比率を決定（個別配分比率 or 全体配分比率）
+      let husbandRatio: number;
+      let wifeRatio: number;
 
-      const ratio = ratioResponse.data;
+      if (expense.usesCustomRatio && expense.customHusbandRatio !== null && expense.customWifeRatio !== null) {
+        // 個別配分比率を使用
+        husbandRatio = expense.customHusbandRatio;
+        wifeRatio = expense.customWifeRatio;
+      } else {
+        // 全体配分比率を取得
+        const ratioResponse = await allocationRatioService.getAllocationRatio();
+        if (!ratioResponse.success || !ratioResponse.data) {
+          return {
+            success: false,
+            error: '配分比率の取得に失敗しました'
+          };
+        }
+        husbandRatio = ratioResponse.data.husbandRatio;
+        wifeRatio = ratioResponse.data.wifeRatio;
+      }
       
       // 精算金額を計算
-      const husbandAmount = Math.round(expense.amount * ratio.husbandRatio);
-      const wifeAmount = Math.round(expense.amount * ratio.wifeRatio);
+      const husbandAmount = Math.round(expense.amount * husbandRatio);
+      const wifeAmount = Math.round(expense.amount * wifeRatio);
       
       // 支払者を取得（入力者から）
       const userQuery = `

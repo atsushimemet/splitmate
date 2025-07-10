@@ -19,5 +19,6 @@ router.delete('/bulk', ExpenseController.bulkDeleteExpenses);
 // 個別費用の操作
 router.get('/:id', ExpenseController.getExpenseById);
 router.delete('/:id', ExpenseController.deleteExpense);
+router.put('/:id/allocation-ratio', ExpenseController.updateExpenseAllocationRatio);
 
 export default router; 

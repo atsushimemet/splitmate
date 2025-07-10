@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS allocation_ratios (
   CHECK (ABS(husband_ratio + wife_ratio - 1.0) < 0.001)
 );
 
--- Expenses table (with monthly tracking)
+-- Expenses table (with monthly tracking and custom allocation ratios)
 CREATE TABLE IF NOT EXISTS expenses (
   id VARCHAR(255) PRIMARY KEY,
   category VARCHAR(255) NOT NULL,
@@ -26,11 +26,17 @@ CREATE TABLE IF NOT EXISTS expenses (
   payer_id VARCHAR(255) NOT NULL,
   expense_year INT NOT NULL,
   expense_month INT NOT NULL,
+  -- Custom allocation ratio fields
+  custom_husband_ratio DECIMAL(3,2) NULL CHECK (custom_husband_ratio IS NULL OR (custom_husband_ratio >= 0 AND custom_husband_ratio <= 1)),
+  custom_wife_ratio DECIMAL(3,2) NULL CHECK (custom_wife_ratio IS NULL OR (custom_wife_ratio >= 0 AND custom_wife_ratio <= 1)),
+  uses_custom_ratio BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (payer_id) REFERENCES users(id) ON DELETE CASCADE,
   CHECK (expense_year >= 2020 AND expense_year <= 2099),
-  CHECK (expense_month >= 1 AND expense_month <= 12)
+  CHECK (expense_month >= 1 AND expense_month <= 12),
+  -- Custom ratio validation: if uses_custom_ratio is true, both custom ratios must be set and sum to 1
+  CHECK (uses_custom_ratio = FALSE OR (custom_husband_ratio IS NOT NULL AND custom_wife_ratio IS NOT NULL AND ABS(custom_husband_ratio + custom_wife_ratio - 1.0) < 0.001))
 );
 
 -- Settlements table

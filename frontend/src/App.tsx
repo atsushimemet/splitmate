@@ -203,6 +203,26 @@ const AppContent = () => {
     console.log('精算が更新されました');
   };
 
+  // 費用が更新された時の処理
+  const handleExpenseUpdate = useCallback((updatedExpense: Expense) => {
+    console.log('Expense updated:', updatedExpense);
+    
+    // 全体データを再取得せず、該当する費用項目だけを更新してレイアウトシフトを防ぐ
+    if (activeTab === 'expenses') {
+      setExpenses(prevExpenses => 
+        prevExpenses.map(expense => 
+          expense.id === updatedExpense.id ? updatedExpense : expense
+        )
+      );
+    } else if (activeTab === 'monthly') {
+      setMonthlyExpenses(prevExpenses => 
+        prevExpenses.map(expense => 
+          expense.id === updatedExpense.id ? updatedExpense : expense
+        )
+      );
+    }
+  }, [activeTab]);
+
   const generateYearOptions = () => {
     const currentYear = new Date().getFullYear();
     const years = [];
@@ -347,7 +367,8 @@ const AppContent = () => {
                 expenses={expenses} 
                 onDelete={handleDeleteExpense} 
                 onBulkDelete={handleBulkDeleteExpenses}
-                isLoading={isLoading} 
+                isLoading={isLoading}
+                onExpenseUpdate={handleExpenseUpdate}
               />
             </div>
           </div>
@@ -403,6 +424,7 @@ const AppContent = () => {
               onBulkDelete={handleBulkDeleteExpenses}
               isLoading={isMonthlyLoading}
               title={`${selectedYear}年${selectedMonth}月の費用一覧`}
+              onExpenseUpdate={handleExpenseUpdate}
             />
           </div>
         )}

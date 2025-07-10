@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AllocationRatio, ApiResponse, CreateExpenseRequest, Expense, ExpenseStats, MonthlyExpenseStats, MonthlyExpenseSummary, Settlement, UpdateAllocationRatioRequest } from '../types';
+import { AllocationRatio, ApiResponse, CreateExpenseRequest, Expense, ExpenseStats, MonthlyExpenseStats, MonthlyExpenseSummary, Settlement, UpdateAllocationRatioRequest, UpdateExpenseAllocationRatioRequest } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -120,6 +120,16 @@ export const expenseApi = {
       return response.data;
     } catch (error: any) {
       return formatError(error, '統計情報の取得に失敗しました');
+    }
+  },
+
+  // 費用の個別配分比率を更新
+  updateExpenseAllocationRatio: async (expenseId: string, data: UpdateExpenseAllocationRatioRequest): Promise<ApiResponse<Expense>> => {
+    try {
+      const response = await api.put(`/expenses/${expenseId}/allocation-ratio`, data);
+      return response.data;
+    } catch (error: any) {
+      return formatError(error, '費用の配分比率更新に失敗しました');
     }
   }
 };
