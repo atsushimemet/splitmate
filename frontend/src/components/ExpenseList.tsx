@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { allocationApi, expenseApi } from '../services/api';
+import { allocationApi, expenseApi, settlementApi } from '../services/api';
 import { AllocationRatio, Expense } from '../types';
 
 interface ExpenseListProps {
@@ -27,6 +27,8 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   const [tempRatios, setTempRatios] = useState<Map<string, number>>(new Map());
   // デバウンス用のタイマーを保存
   const [debounceTimers, setDebounceTimers] = useState<Map<string, NodeJS.Timeout>>(new Map());
+  // 承認済み精算に関連する費用IDのセット
+  const [approvedExpenseIds, setApprovedExpenseIds] = useState<Set<string>>(new Set());
 
   // 全体の配分比率を取得
   useEffect(() => {
@@ -42,6 +44,43 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
     };
 
     loadDefaultAllocationRatio();
+  }, []);
+
+  // 承認済み精算情報を取得
+  useEffect(() => {
+    const loadApprovedSettlements = async () => {
+      try {
+        const response = await settlementApi.getAllSettlements();
+        if (response.success && response.data) {
+          const approvedIds = new Set(
+            response.data
+              .filter(settlement => settlement.status === 'approved')
+              .map(settlement => settlement.expenseId)
+          );
+          setApprovedExpenseIds(approvedIds);
+        }
+      } catch (error) {
+        console.error('Failed to load approved settlements:', error);
+      }
+    };
+
+    loadApprovedSettlements();
+    
+    // ストレージイベントリスナーを追加（精算状況変更時の自動更新）
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'settlementUpdated' || e.key === 'allocationRatioUpdated') {
+        loadApprovedSettlements();
+        if (e.key === 'settlementUpdated') {
+          localStorage.removeItem('settlementUpdated');
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   // クリーンアップ処理：コンポーネントのアンマウント時にタイマーをクリア
@@ -89,8 +128,19 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
             Math.abs(expense.customWifeRatio - defaultAllocationRatio.wifeRatio) > 0.01);
   };
 
+  // 費用明細が承認済み精算に関連しているかどうかを判定
+  const isExpenseApproved = (expenseId: string): boolean => {
+    return approvedExpenseIds.has(expenseId);
+  };
+
   // 配分比率の更新（デバウンス機能付き）
   const debouncedUpdateAllocationRatio = useCallback(async (expenseId: string, husbandRatio: number) => {
+    // 承認済み費用明細の場合は更新を拒否
+    if (isExpenseApproved(expenseId)) {
+      console.log('Cannot update allocation ratio for approved expense');
+      return;
+    }
+
     const wifeRatio = 1 - husbandRatio;
     
     setUpdatingExpenses(prev => new Set(prev).add(expenseId));
@@ -129,10 +179,15 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
         return newSet;
       });
     }
-  }, [onExpenseUpdate]);
+  }, [onExpenseUpdate, approvedExpenseIds]);
 
   // スライダーの操作ハンドラー（リアルタイム表示 + デバウンスAPI呼び出し）
   const handleAllocationRatioChange = useCallback((expenseId: string, husbandRatio: number) => {
+    // 承認済み費用明細の場合は操作を無効化
+    if (isExpenseApproved(expenseId)) {
+      return;
+    }
+
     // リアルタイム表示のために一時的な値を設定
     setTempRatios(prev => {
       const newMap = new Map(prev);
@@ -166,10 +221,16 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
       newMap.set(expenseId, newTimer);
       return newMap;
     });
-  }, [debouncedUpdateAllocationRatio]);
+  }, [debouncedUpdateAllocationRatio, approvedExpenseIds]);
 
   // 配分比率のリセット
   const handleResetAllocationRatio = useCallback(async (expenseId: string) => {
+    // 承認済み費用明細の場合はリセットを拒否
+    if (isExpenseApproved(expenseId)) {
+      console.log('Cannot reset allocation ratio for approved expense');
+      return;
+    }
+
     if (!defaultAllocationRatio) return;
     
     // デバウンスタイマーをクリア
@@ -214,7 +275,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
         return newSet;
       });
     }
-  }, [defaultAllocationRatio, onExpenseUpdate]);
+  }, [defaultAllocationRatio, onExpenseUpdate, approvedExpenseIds]);
 
   // 現在の配分比率を取得（一時的な値も考慮）
   const getCurrentRatio = (expense: Expense): number => {
@@ -328,13 +389,14 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
           const hasCustomRatio = isCustomRatio(expense);
           const currentRatio = getCurrentRatio(expense);
           const isUpdating = updatingExpenses.has(expense.id);
+          const isApproved = isExpenseApproved(expense.id);
           
           return (
             <div 
               key={expense.id} 
               className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
                 hasCustomRatio ? 'bg-red-50 border-red-200' : 'border-gray-200'
-              }`}
+              } ${isApproved ? 'opacity-75' : ''}`}
             >
               {/* チェックボックス */}
               <div className="flex items-start gap-3">
@@ -371,6 +433,11 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                     <span className="text-sm text-gray-500">
                       {getPayerName(expense.payerId)}
                     </span>
+                    {isApproved && (
+                      <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                        承認済み
+                      </span>
+                    )}
                   </div>
 
                   {/* 3行目：説明 */}
@@ -392,6 +459,9 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                         <div className="w-3 h-3 border border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
                       )}
                     </div>
+                    {isApproved && (
+                      <span className="text-xs text-gray-500">（変更不可）</span>
+                    )}
                   </div>
 
                   {/* 5行目：スライダー リセット */}
@@ -403,21 +473,23 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                       step="0.01"
                       value={currentRatio}
                       onChange={(e) => handleAllocationRatioChange(expense.id, parseFloat(e.target.value))}
-                      disabled={isUpdating}
-                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={isUpdating || isApproved}
+                      className={`flex-1 h-2 bg-gray-200 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        isApproved ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                      }`}
                       style={{ touchAction: 'pan-y' }}
                     />
                     {/* リセットボタン用の固定スペース（レイアウトシフト防止） */}
                     <div className="w-12 flex justify-end">
                       <button
                         onClick={() => handleResetAllocationRatio(expense.id)}
-                        disabled={isUpdating}
+                        disabled={isUpdating || isApproved}
                         className={`text-xs whitespace-nowrap px-1 py-0 min-w-0 flex-shrink-0 ${
-                          hasCustomRatio 
+                          hasCustomRatio && !isApproved
                             ? 'text-blue-600 hover:text-blue-800 disabled:text-gray-400 visible' 
                             : 'invisible'
                         }`}
-                        title="デフォルトに戻す"
+                        title={isApproved ? "承認済みのため変更できません" : "デフォルトに戻す"}
                       >
                         リセット
                       </button>

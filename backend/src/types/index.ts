@@ -41,6 +41,13 @@ export interface Settlement {
   status: 'pending' | 'approved' | 'completed';
   createdAt: Date;
   updatedAt: Date;
+  // Additional expense details for display
+  expenseDescription?: string;
+  expenseAmount?: number;
+  // Custom allocation ratio fields
+  customHusbandRatio?: number | null;
+  customWifeRatio?: number | null;
+  usesCustomRatio: boolean;
 }
 
 export interface CreateExpenseRequest {

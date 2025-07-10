@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../database/connection-mysql';
 import { ApiResponse, CreateExpenseRequest, Expense, MonthlyExpenseStats, MonthlyExpenseSummary, UpdateExpenseAllocationRatioRequest } from '../types';
+import { settlementService } from './settlementService-mysql';
 
 export class ExpenseService {
   /**
@@ -48,6 +49,14 @@ export class ExpenseService {
       // 作成された費用を取得
       const result = await ExpenseService.getExpenseById(id);
       if (result.success && result.data) {
+        // 費用作成後、精算を計算
+        try {
+          await settlementService.calculateSettlement(id);
+        } catch (error) {
+          console.error(`Error calculating settlement for new expense ${id}:`, error);
+          // 精算の計算が失敗しても、費用の作成は成功として扱う
+        }
+        
         return {
           success: true,
           data: result.data,
@@ -452,6 +461,14 @@ export class ExpenseService {
           success: false,
           error: 'Expense not found'
         };
+      }
+      
+      // 個別配分比率の更新後、該当する精算を再計算
+      try {
+        await settlementService.calculateSettlement(expenseId);
+      } catch (error) {
+        console.error(`Error recalculating settlement for expense ${expenseId}:`, error);
+        // 精算の再計算が失敗しても、費用の更新は成功として扱う
       }
       
       // 更新された費用を取得

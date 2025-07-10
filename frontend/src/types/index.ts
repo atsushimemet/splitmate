@@ -78,6 +78,10 @@ export interface Settlement {
   updatedAt: Date;
   expenseDescription?: string;
   expenseAmount?: number;
+  // Custom allocation ratio fields
+  customHusbandRatio?: number | null;
+  customWifeRatio?: number | null;
+  usesCustomRatio: boolean;
 }
 
 // Monthly expense specific interfaces

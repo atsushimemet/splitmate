@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { settlementApi } from '../services/api';
-import { Settlement } from '../types';
+import { allocationApi, settlementApi } from '../services/api';
+import { AllocationRatio, Settlement } from '../types';
 
 interface SettlementListProps {
   onSettlementUpdate?: () => void;
@@ -26,34 +26,57 @@ function VerificationModal({ settlement, isOpen, onClose }: VerificationModalPro
   };
 
   const getCalculationSteps = () => {
-    const totalAmount = settlement.husbandAmount + settlement.wifeAmount;
+    const steps = [];
     
-    const steps = [
-      {
-        step: 1,
-        title: '立替者が総額を支払う',
-        description: `立替者（${getPayerName(settlement.payer)}）が総額を支払う`,
-        calculation: `${getPayerName(settlement.payer)}が支払った金額: ${totalAmount.toLocaleString()}円`,
-        result: `${totalAmount.toLocaleString()}円`
-      },
-      {
-        step: 2,
-        title: '按分比率による負担金額の算出',
-        description: `設定された按分比率に基づいて各人の負担金額を計算`,
-        husbandCalc: `夫の負担額: ${settlement.husbandAmount.toLocaleString()}円`,
-        wifeCalc: `妻の負担額: ${settlement.wifeAmount.toLocaleString()}円`,
-        result: `夫: ${settlement.husbandAmount.toLocaleString()}円, 妻: ${settlement.wifeAmount.toLocaleString()}円`
-      },
-      {
-        step: 3,
-        title: '精算者の支払い金額を決定',
-        description: `立替者でない人（精算者）が立替者に支払う金額を計算`,
-        calculation: settlement.payer === 'husband' 
-          ? `妻（精算者）が夫（立替者）に支払う金額: ${settlement.settlementAmount.toLocaleString()}円`
-          : `夫（精算者）が妻（立替者）に支払う金額: ${settlement.settlementAmount.toLocaleString()}円`,
-        result: `${getPayerName(settlement.receiver)}から${getPayerName(settlement.payer)}に${settlement.settlementAmount.toLocaleString()}円`
-      }
-    ];
+    // 基本情報
+    steps.push({
+      title: '1. 基本情報',
+      items: [
+        `費用金額: ¥${(settlement.husbandAmount + settlement.wifeAmount).toLocaleString()}`,
+        `立替者: ${getPayerName(settlement.payer)}`,
+        `受取者: ${getPayerName(settlement.receiver)}`
+      ]
+    });
+
+    // 個別配分比率の表示
+    if (settlement.usesCustomRatio && settlement.customHusbandRatio !== null && settlement.customWifeRatio !== null && settlement.customHusbandRatio !== undefined && settlement.customWifeRatio !== undefined) {
+      steps.push({
+        title: '2. 個別配分比率（カスタム設定）',
+        items: [
+          `夫の配分比率: ${Math.round(settlement.customHusbandRatio * 100)}%`,
+          `妻の配分比率: ${Math.round(settlement.customWifeRatio * 100)}%`,
+          '※ この費用は個別に配分比率が設定されています'
+        ]
+      });
+    } else {
+      steps.push({
+        title: '2. 配分比率（全体設定）',
+        items: [
+          `夫の配分比率: ${Math.round((settlement.husbandAmount / (settlement.husbandAmount + settlement.wifeAmount)) * 100)}%`,
+          `妻の配分比率: ${Math.round((settlement.wifeAmount / (settlement.husbandAmount + settlement.wifeAmount)) * 100)}%`,
+          '※ 全体配分比率設定を使用'
+        ]
+      });
+    }
+
+    // 計算結果
+    steps.push({
+      title: '3. 負担額計算',
+      items: [
+        `夫の負担額: ¥${settlement.husbandAmount.toLocaleString()}`,
+        `妻の負担額: ¥${settlement.wifeAmount.toLocaleString()}`,
+        `差額: ¥${Math.abs(settlement.husbandAmount - settlement.wifeAmount).toLocaleString()}`
+      ]
+    });
+
+    // 精算結果
+    steps.push({
+      title: '4. 精算結果',
+      items: [
+        `${getPayerName(settlement.receiver)}が${getPayerName(settlement.payer)}に支払い`,
+        `精算金額: ¥${settlement.settlementAmount.toLocaleString()}`
+      ]
+    });
 
     return steps;
   };
@@ -80,75 +103,52 @@ function VerificationModal({ settlement, isOpen, onClose }: VerificationModalPro
 
         <div className="p-6">
           {/* 基本情報 */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <h3 className="text-lg font-semibold text-blue-900 mb-3">精算概要</h3>
+          <div className={`border rounded-lg p-4 mb-6 ${
+            settlement.usesCustomRatio ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'
+          }`}>
+            <h3 className={`text-lg font-semibold mb-3 ${
+              settlement.usesCustomRatio ? 'text-red-900' : 'text-blue-900'
+            }`}>
+              精算概要
+            </h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-blue-700 font-medium">夫の負担額:</span>
-                <span className="ml-2 text-blue-900">¥{settlement.husbandAmount.toLocaleString()}</span>
+                <span className={settlement.usesCustomRatio ? 'text-red-700 font-medium' : 'text-blue-700 font-medium'}>夫の負担額:</span>
+                <span className={`ml-2 ${settlement.usesCustomRatio ? 'text-red-900' : 'text-blue-900'}`}>
+                  ¥{settlement.husbandAmount.toLocaleString()}
+                </span>
               </div>
               <div>
-                <span className="text-blue-700 font-medium">妻の負担額:</span>
-                <span className="ml-2 text-blue-900">¥{settlement.wifeAmount.toLocaleString()}</span>
+                <span className={settlement.usesCustomRatio ? 'text-red-700 font-medium' : 'text-blue-700 font-medium'}>妻の負担額:</span>
+                <span className={`ml-2 ${settlement.usesCustomRatio ? 'text-red-900' : 'text-blue-900'}`}>
+                  ¥{settlement.wifeAmount.toLocaleString()}
+                </span>
               </div>
               <div>
-                <span className="text-blue-700 font-medium">立替者:</span>
-                <span className="ml-2 text-blue-900">{getPayerName(settlement.payer)}</span>
+                <span className={settlement.usesCustomRatio ? 'text-red-700 font-medium' : 'text-blue-700 font-medium'}>立替者:</span>
+                <span className={`ml-2 ${settlement.usesCustomRatio ? 'text-red-900' : 'text-blue-900'}`}>{getPayerName(settlement.payer)}</span>
               </div>
               <div>
-                <span className="text-blue-700 font-medium">精算金額:</span>
-                <span className="ml-2 text-blue-900 font-bold">¥{settlement.settlementAmount.toLocaleString()}</span>
+                <span className={settlement.usesCustomRatio ? 'text-red-700 font-medium' : 'text-blue-700 font-medium'}>精算金額:</span>
+                <span className={`ml-2 font-bold ${settlement.usesCustomRatio ? 'text-red-900' : 'text-blue-900'}`}>¥{settlement.settlementAmount.toLocaleString()}</span>
               </div>
             </div>
           </div>
 
           {/* 計算過程 */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">計算過程</h3>
-            {getCalculationSteps().map((step) => (
-              <div key={step.step} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center mb-3">
-                  <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mr-3">
-                    {step.step}
-                  </div>
-                  <h4 className="text-md font-medium text-gray-900">{step.title}</h4>
-                </div>
-                
-                <p className="text-sm text-gray-600 mb-2">{step.description}</p>
-                
-                {step.husbandCalc && step.wifeCalc ? (
-                  <div className="space-y-1 mb-2">
-                    <div className="text-sm font-mono bg-gray-100 p-2 rounded">
-                      {step.husbandCalc}
-                    </div>
-                    <div className="text-sm font-mono bg-gray-100 p-2 rounded">
-                      {step.wifeCalc}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-sm font-mono bg-gray-100 p-2 rounded mb-2">
-                    {step.calculation}
-                  </div>
-                )}
-                
-                <div className="text-sm">
-                  <span className="text-gray-600">結果: </span>
-                  <span className="font-medium text-gray-900">{step.result}</span>
-                </div>
+            <h4 className="font-medium text-gray-900 mb-3">計算過程</h4>
+            {getCalculationSteps().map((step, index) => (
+              <div key={index} className="bg-gray-50 rounded-lg p-4">
+                <h5 className="font-medium text-gray-900 mb-2">{step.title}</h5>
+                <ul className="space-y-1">
+                  {step.items.map((item, itemIndex) => (
+                    <li key={itemIndex} className="text-sm text-gray-700">• {item}</li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
-
-
-        </div>
-
-        <div className="px-6 py-4 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="w-full btn-primary"
-          >
-            閉じる
-          </button>
         </div>
       </div>
     </div>
@@ -159,42 +159,49 @@ function FinalSettlementVerificationModal({ settlements, isOpen, onClose }: Fina
   if (!isOpen) return null;
 
   const getCalculationDetails = () => {
-    // 妻から夫に支払う金額の合計
-    const wifeToHusbandTotal = settlements
-      .filter(settlement => settlement.payer === 'husband' && settlement.receiver === 'wife')
-      .reduce((sum, settlement) => sum + settlement.settlementAmount, 0);
-
-    // 夫から妻に支払う金額の合計
-    const husbandToWifeTotal = settlements
-      .filter(settlement => settlement.payer === 'wife' && settlement.receiver === 'husband')
-      .reduce((sum, settlement) => sum + settlement.settlementAmount, 0);
-
-    const finalAmount = Math.abs(wifeToHusbandTotal - husbandToWifeTotal);
-    const finalDate = new Date();
-    finalDate.setDate(finalDate.getDate() + 7);
-
-    let direction = '';
-    if (wifeToHusbandTotal > husbandToWifeTotal) {
-      direction = `妻から夫に支払う金額の合計 > 夫から妻に支払う金額の合計なので\n妻から夫に${finalAmount.toLocaleString()}円を${finalDate.toLocaleDateString('ja-JP')}までに支払ってください。`;
-    } else if (husbandToWifeTotal > wifeToHusbandTotal) {
-      direction = `夫から妻に支払う金額の合計 > 妻から夫に支払う金額の合計なので\n夫から妻に${finalAmount.toLocaleString()}円を${finalDate.toLocaleDateString('ja-JP')}までに支払ってください。`;
-    } else {
-      direction = '精算金額はありません。すべての費用が適切に配分されています。';
-    }
-
-    return {
-      wifeToHusbandTotal,
-      husbandToWifeTotal,
-      finalAmount,
-      direction
-    };
+    let husbandTotal = 0;
+    let wifeTotal = 0;
+    
+    const details = settlements.map((settlement) => {
+      const receiverAmount = settlement.receiver === 'husband' ? settlement.settlementAmount : -settlement.settlementAmount;
+      
+      if (settlement.receiver === 'husband') {
+        husbandTotal += settlement.settlementAmount;
+      } else {
+        wifeTotal += settlement.settlementAmount;
+      }
+      
+      return {
+        id: settlement.id,
+        description: settlement.expenseDescription || '説明なし',
+        receiver: settlement.receiver === 'husband' ? '夫' : '妻',
+        payer: settlement.payer === 'husband' ? '夫' : '妻',
+        amount: settlement.settlementAmount,
+        receiverAmount,
+        hasCustomRatio: settlement.usesCustomRatio,
+        customHusbandRatio: settlement.customHusbandRatio,
+        customWifeRatio: settlement.customWifeRatio
+      };
+    });
+    
+    const finalDirection = husbandTotal > wifeTotal ? {
+      from: '妻',
+      to: '夫', 
+      amount: husbandTotal - wifeTotal
+    } : husbandTotal < wifeTotal ? {
+      from: '夫',
+      to: '妻',
+      amount: wifeTotal - husbandTotal
+    } : null;
+    
+    return { details, finalDirection, husbandTotal, wifeTotal };
   };
 
-  const calculationDetails = getCalculationDetails();
+  const { details, finalDirection, husbandTotal, wifeTotal } = getCalculationDetails();
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -213,87 +220,65 @@ function FinalSettlementVerificationModal({ settlements, isOpen, onClose }: Fina
         </div>
 
         <div className="p-6">
-          {/* 基本情報 */}
+          {/* 個別精算明細 */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">個別精算明細</h3>
+            <div className="space-y-3">
+              {details.map((detail) => (
+                <div key={detail.id} className={`rounded-lg p-4 border ${
+                  detail.hasCustomRatio ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="text-sm font-medium text-gray-900">{detail.description}</span>
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        {detail.payer} → {detail.receiver}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`text-sm font-medium ${
+                        detail.receiverAmount > 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {detail.receiverAmount > 0 ? '+' : ''}¥{detail.amount.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 合計計算 */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <h3 className="text-lg font-semibold text-blue-900 mb-3">精算概要</h3>
+            <h4 className="font-medium text-blue-900 mb-3">合計計算</h4>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-blue-700 font-medium">妻から夫に支払う金額の合計:</span>
-                <span className="ml-2 text-blue-900">¥{calculationDetails.wifeToHusbandTotal.toLocaleString()}</span>
+                <span className="text-blue-700 font-medium">夫の受け取り合計:</span>
+                <span className="ml-2 text-blue-900 font-bold">¥{husbandTotal.toLocaleString()}</span>
               </div>
               <div>
-                <span className="text-blue-700 font-medium">夫から妻に支払う金額の合計:</span>
-                <span className="ml-2 text-blue-900">¥{calculationDetails.husbandToWifeTotal.toLocaleString()}</span>
+                <span className="text-blue-700 font-medium">妻の受け取り合計:</span>
+                <span className="ml-2 text-blue-900 font-bold">¥{wifeTotal.toLocaleString()}</span>
               </div>
             </div>
           </div>
 
-          {/* 計算過程 */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">計算過程</h3>
-            
-            <div className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center mb-3">
-                <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mr-3">
-                  1
-                </div>
-                <h4 className="text-md font-medium text-gray-900">妻から夫に支払う金額の合計</h4>
-              </div>
-              <div className="text-sm font-mono bg-gray-100 p-2 rounded mb-2">
-                ¥{calculationDetails.wifeToHusbandTotal.toLocaleString()}
-              </div>
-              <div className="text-sm">
-                <span className="text-gray-600">結果: </span>
-                <span className="font-medium text-gray-900">¥{calculationDetails.wifeToHusbandTotal.toLocaleString()}</span>
-              </div>
-            </div>
-
-            <div className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center mb-3">
-                <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mr-3">
-                  2
-                </div>
-                <h4 className="text-md font-medium text-gray-900">夫から妻に支払う金額の合計</h4>
-              </div>
-              <div className="text-sm font-mono bg-gray-100 p-2 rounded mb-2">
-                ¥{calculationDetails.husbandToWifeTotal.toLocaleString()}
-              </div>
-              <div className="text-sm">
-                <span className="text-gray-600">結果: </span>
-                <span className="font-medium text-gray-900">¥{calculationDetails.husbandToWifeTotal.toLocaleString()}</span>
-              </div>
-            </div>
-
-            <div className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center mb-3">
-                <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-medium mr-3">
-                  3
-                </div>
-                <h4 className="text-md font-medium text-gray-900">最終精算金額の決定</h4>
-              </div>
-              <div className="text-sm font-mono bg-gray-100 p-2 rounded mb-2 whitespace-pre-line">
-                {calculationDetails.direction}
-              </div>
-              <div className="text-sm">
-                <span className="text-gray-600">結果: </span>
-                <span className="font-medium text-gray-900">
-                  {calculationDetails.finalAmount > 0 
-                    ? `¥${calculationDetails.finalAmount.toLocaleString()}`
-                    : '精算不要'
-                  }
-                </span>
-              </div>
-            </div>
+          {/* 最終精算結果 */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <h4 className="font-medium text-green-900 mb-3">最終精算結果</h4>
+            {finalDirection ? (
+              <p className="text-green-800">
+                <span className="font-medium">{finalDirection.from}</span>が<span className="font-medium">{finalDirection.to}</span>に
+                <span className="font-bold text-lg">¥{finalDirection.amount.toLocaleString()}</span>を支払う
+              </p>
+            ) : (
+              <p className="text-green-800">
+                精算金額はありません。すべての費用が適切に配分されています。
+              </p>
+            )}
           </div>
-        </div>
-
-        <div className="px-6 py-4 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="w-full btn-primary"
-          >
-            閉じる
-          </button>
         </div>
       </div>
     </div>
@@ -305,6 +290,7 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFinalSettlement, setShowFinalSettlement] = useState(false);
+  const [defaultAllocationRatio, setDefaultAllocationRatio] = useState<AllocationRatio | null>(null);
   const [verificationModal, setVerificationModal] = useState<{ isOpen: boolean; settlement: Settlement | null }>({
     isOpen: false,
     settlement: null
@@ -317,6 +303,7 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
 
   useEffect(() => {
     loadSettlements();
+    loadDefaultAllocationRatio();
   }, []);
 
   // 外部からの更新通知を受け取る
@@ -332,6 +319,18 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
+
+  // 全体の配分比率を取得
+  const loadDefaultAllocationRatio = async () => {
+    try {
+      const response = await allocationApi.getAllocationRatio();
+      if (response.success && response.data) {
+        setDefaultAllocationRatio(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to load default allocation ratio:', error);
+    }
+  };
 
   const loadSettlements = async () => {
     setIsLoading(true);
@@ -357,6 +356,8 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
       if (response.success) {
         await loadSettlements();
         onSettlementUpdate?.();
+        // ExpenseListに精算状況の変更を通知
+        localStorage.setItem('settlementUpdated', Date.now().toString());
       } else {
         setError(response.error || '精算の承認に失敗しました');
       }
@@ -378,6 +379,19 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
     }
   };
 
+  // 個別配分比率が実際にデフォルトと異なるかどうかの判定
+  const hasCustomRatio = (settlement: Settlement) => {
+    if (!defaultAllocationRatio) return false;
+    
+    return settlement.usesCustomRatio && 
+           settlement.customHusbandRatio !== null && 
+           settlement.customWifeRatio !== null &&
+           settlement.customHusbandRatio !== undefined &&
+           settlement.customWifeRatio !== undefined &&
+           (Math.abs(settlement.customHusbandRatio - defaultAllocationRatio.husbandRatio) > 0.01 ||
+            Math.abs(settlement.customWifeRatio - defaultAllocationRatio.wifeRatio) > 0.01);
+  };
+
   const handleFinalSettlement = () => {
     setShowFinalSettlement(true);
   };
@@ -389,44 +403,48 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
   const getSettlementDirection = () => {
     const approvedSettlements = getApprovedSettlements();
     
-    // 夫と妻それぞれの未精算金額を計算
-    let husbandUnsettled = 0;
-    let wifeUnsettled = 0;
-    
-    console.log('承認済み精算:', approvedSettlements);
+    let husbandReceives = 0;
+    let wifeReceives = 0;
     
     approvedSettlements.forEach(settlement => {
-      if (settlement.payer === 'husband') {
-        // 夫が立替者の場合、妻が夫に精算金を支払う
-        wifeUnsettled += settlement.settlementAmount;
-        console.log(`夫が立替者: 精算金額 ${settlement.settlementAmount} を妻の未精算に追加`);
+      if (settlement.receiver === 'husband') {
+        husbandReceives += settlement.settlementAmount;
       } else {
-        // 妻が立替者の場合、夫が妻に精算金を支払う
-        husbandUnsettled += settlement.settlementAmount;
-        console.log(`妻が立替者: 精算金額 ${settlement.settlementAmount} を夫の未精算に追加`);
+        wifeReceives += settlement.settlementAmount;
       }
     });
     
-    console.log(`夫の未精算: ${husbandUnsettled}, 妻の未精算: ${wifeUnsettled}`);
-    
-    // 精算方向を決定（未精算金額が多い方から少ない方へ）
-    if (husbandUnsettled > wifeUnsettled) {
-      console.log(`夫の未精算 > 妻の未精算: 夫から妻に ${husbandUnsettled - wifeUnsettled}`);
-      return { from: '夫', to: '妻', amount: husbandUnsettled - wifeUnsettled };
-    } else if (wifeUnsettled > husbandUnsettled) {
-      console.log(`妻の未精算 > 夫の未精算: 妻から夫に ${wifeUnsettled - husbandUnsettled}`);
-      return { from: '妻', to: '夫', amount: wifeUnsettled - husbandUnsettled };
+    if (husbandReceives > wifeReceives) {
+      return {
+        from: '妻',
+        to: '夫',
+        amount: husbandReceives - wifeReceives
+      };
+    } else if (wifeReceives > husbandReceives) {
+      return {
+        from: '夫',
+        to: '妻',
+        amount: wifeReceives - husbandReceives
+      };
     } else {
-      console.log('未精算金額が同じ');
-      return { from: null, to: null, amount: 0 };
+      return {
+        from: null,
+        to: null,
+        amount: 0
+      };
     }
   };
 
   const getFinalSettlementDate = () => {
     const today = new Date();
     const finalDate = new Date(today);
-    finalDate.setDate(today.getDate() + 7);
-    return finalDate.toLocaleDateString('ja-JP');
+    finalDate.setDate(today.getDate() + 7); // 7日後
+    
+    return finalDate.toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: '2-digit', 
+      day: '2-digit'
+    });
   };
 
   if (isLoading) {
@@ -529,8 +547,12 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
                   (settlementDirection.from === '夫' && settlementDirection.to === '妻');
                 
                 return (
-                  <div key={settlement.id} className="flex justify-between text-sm">
-                    <span>精算 {index + 1} ({isReceiver} → {isPayer})</span>
+                  <div key={settlement.id} className={`flex justify-between text-sm p-2 rounded ${
+                    hasCustomRatio(settlement) ? 'bg-red-50 border border-red-200' : ''
+                  }`}>
+                    <div className="flex items-center space-x-2">
+                      <span>精算 {index + 1} ({isReceiver} → {isPayer})</span>
+                    </div>
                     <span className={`font-medium ${isNegative ? 'text-red-600' : 'text-green-600'}`}>
                       {isNegative ? '-' : '+'}¥{amount.toLocaleString()}
                     </span>
@@ -602,50 +624,65 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <h3 className="text-lg font-semibold text-blue-900 mb-4">夫の精算</h3>
                   <div className="space-y-3">
-                    {husbandSettlements.map((settlement) => (
-                      <div key={settlement.id} className="bg-white rounded-lg p-4 border border-blue-100">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <h4 className="text-sm font-medium text-gray-900">
-                                説明: {settlement.expenseDescription || '説明なし'}
-                              </h4>
-                              {getStatusBadge(settlement.status)}
+                    {husbandSettlements.map((settlement) => {
+                      const hasCustom = hasCustomRatio(settlement);
+                      return (
+                        <div key={settlement.id} className={`rounded-lg p-4 border ${
+                          hasCustom ? 'bg-red-50 border-red-200' : 'bg-white border-blue-100'
+                        }`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3 mb-2">
+                                <h4 className="text-sm font-medium text-gray-900">
+                                  説明: {settlement.expenseDescription || '説明なし'}
+                                </h4>
+                                {getStatusBadge(settlement.status)}
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <span className="text-gray-500">合計金額:</span>
+                                  <span className="ml-2 font-medium text-gray-900">
+                                    ¥{(settlement.husbandAmount + settlement.wifeAmount).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">夫の負担額:</span>
+                                  <span className="ml-2 font-medium text-gray-900">
+                                    ¥{settlement.husbandAmount.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">妻の負担額:</span>
+                                  <span className="ml-2 font-medium text-gray-900">
+                                    ¥{settlement.wifeAmount.toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                              <div>
-                                <span className="text-gray-500">合計金額:</span>
-                                <span className="ml-2 font-medium text-gray-900">
-                                  ¥{(settlement.husbandAmount + settlement.wifeAmount).toLocaleString()}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">夫の負担額:</span>
-                                <span className="ml-2 font-medium text-gray-900">
-                                  ¥{settlement.husbandAmount.toLocaleString()}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">妻の負担額:</span>
-                                <span className="ml-2 font-medium text-gray-900">
-                                  ¥{settlement.wifeAmount.toLocaleString()}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="ml-4 flex flex-col space-y-2">
-                            {settlement.status === 'pending' && (
+                            <div className="ml-4 flex flex-col space-y-2">
+                              {settlement.status === 'pending' && (
+                                <button
+                                  onClick={() => handleApprove(settlement.id)}
+                                  className="btn-primary text-sm px-3 py-1"
+                                >
+                                  承認
+                                </button>
+                              )}
                               <button
-                                onClick={() => handleApprove(settlement.id)}
-                                className="btn-primary text-sm px-3 py-1"
+                                onClick={() => setVerificationModal({ isOpen: true, settlement })}
+                                className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                                title="精算ロジックを確認"
                               >
-                                承認
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                検算
                               </button>
-                            )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -660,50 +697,65 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
                 <div className="bg-pink-50 border border-pink-200 rounded-lg p-4">
                   <h3 className="text-lg font-semibold text-pink-900 mb-4">妻の精算</h3>
                   <div className="space-y-3">
-                    {wifeSettlements.map((settlement) => (
-                      <div key={settlement.id} className="bg-white rounded-lg p-4 border border-pink-100">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <h4 className="text-sm font-medium text-gray-900">
-                                説明: {settlement.expenseDescription || '説明なし'}
-                              </h4>
-                              {getStatusBadge(settlement.status)}
+                    {wifeSettlements.map((settlement) => {
+                      const hasCustom = hasCustomRatio(settlement);
+                      return (
+                        <div key={settlement.id} className={`rounded-lg p-4 border ${
+                          hasCustom ? 'bg-red-50 border-red-200' : 'bg-white border-pink-100'
+                        }`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3 mb-2">
+                                <h4 className="text-sm font-medium text-gray-900">
+                                  説明: {settlement.expenseDescription || '説明なし'}
+                                </h4>
+                                {getStatusBadge(settlement.status)}
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <span className="text-gray-500">合計金額:</span>
+                                  <span className="ml-2 font-medium text-gray-900">
+                                    ¥{(settlement.husbandAmount + settlement.wifeAmount).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">夫の負担額:</span>
+                                  <span className="ml-2 font-medium text-gray-900">
+                                    ¥{settlement.husbandAmount.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">妻の負担額:</span>
+                                  <span className="ml-2 font-medium text-gray-900">
+                                    ¥{settlement.wifeAmount.toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                              <div>
-                                <span className="text-gray-500">合計金額:</span>
-                                <span className="ml-2 font-medium text-gray-900">
-                                  ¥{(settlement.husbandAmount + settlement.wifeAmount).toLocaleString()}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">夫の負担額:</span>
-                                <span className="ml-2 font-medium text-gray-900">
-                                  ¥{settlement.husbandAmount.toLocaleString()}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">妻の負担額:</span>
-                                <span className="ml-2 font-medium text-gray-900">
-                                  ¥{settlement.wifeAmount.toLocaleString()}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="ml-4 flex flex-col space-y-2">
-                            {settlement.status === 'pending' && (
+                            <div className="ml-4 flex flex-col space-y-2">
+                              {settlement.status === 'pending' && (
+                                <button
+                                  onClick={() => handleApprove(settlement.id)}
+                                  className="btn-primary text-sm px-3 py-1"
+                                >
+                                  承認
+                                </button>
+                              )}
                               <button
-                                onClick={() => handleApprove(settlement.id)}
-                                className="btn-primary text-sm px-3 py-1"
+                                onClick={() => setVerificationModal({ isOpen: true, settlement })}
+                                className="inline-flex items-center px-2 py-1 text-xs font-medium text-pink-600 bg-pink-50 border border-pink-200 rounded hover:bg-pink-100 hover:border-pink-300 transition-colors"
+                                title="精算ロジックを確認"
                               >
-                                承認
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                検算
                               </button>
-                            )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
