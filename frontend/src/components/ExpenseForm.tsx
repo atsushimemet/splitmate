@@ -11,18 +11,7 @@ export interface ExpenseFormHandle {
   resetAll: () => void;
 }
 
-const EXPENSE_CATEGORIES = [
-  '食費',
-  '日用品',
-  '交通費',
-  '光熱費',
-  '通信費',
-  '医療費',
-  '教育費',
-  '娯楽費',
-  '衣類費',
-  'その他'
-];
+
 
 const DEFAULT_USERS = [
   { id: 'husband-001', name: '夫', role: 'husband' as const },
@@ -66,7 +55,6 @@ const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit,
       if (stored) {
         const parsedData = JSON.parse(stored);
         return {
-          category: parsedData.category || '',
           description: parsedData.description || '',
           amount: 0, // 金額は常に0からスタート
           payerId: parsedData.payerId || 'husband-001',
@@ -80,7 +68,6 @@ const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit,
     
     // デフォルト値
     return {
-      category: '',
       description: '',
       amount: 0,
       payerId: 'husband-001',
@@ -95,7 +82,6 @@ const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit,
   const saveFormDataToStorage = (data: CreateExpenseRequest) => {
     try {
       const dataToStore = {
-        category: data.category,
         description: data.description,
         payerId: data.payerId,
         expenseYear: data.expenseYear,
@@ -117,7 +103,6 @@ const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit,
     },
     resetAll: () => {
       const clearedData = {
-        category: '',
         description: '',
         amount: 0,
         payerId: 'husband-001',
@@ -131,7 +116,7 @@ const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.category && formData.description && formData.amount > 0) {
+    if (formData.description && formData.amount > 0) {
       onSubmit(formData);
       
       // Issue #14: 金額のみリセット、他のフィールドは保持
@@ -152,7 +137,6 @@ const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit,
 
   const handleClearForm = () => {
     const clearedData = {
-      category: '',
       description: '',
       amount: 0,
       payerId: 'husband-001',
@@ -208,26 +192,7 @@ const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit,
           </div>
         </div>
 
-        {/* カテゴリ選択 */}
-        <div>
-          <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
-            カテゴリ *
-          </label>
-          <select
-            id="category"
-            value={formData.category}
-            onChange={(e) => handleInputChange('category', e.target.value)}
-            className="input-field"
-            required
-          >
-            <option value="">カテゴリを選択してください</option>
-            {EXPENSE_CATEGORIES.map(category => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-        </div>
+
 
         {/* 説明入力 */}
         <div>
@@ -287,7 +252,7 @@ const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit,
         <div className="space-y-3">
           <button
             type="submit"
-            disabled={isLoading || !formData.category || !formData.description || formData.amount <= 0}
+            disabled={isLoading || !formData.description || formData.amount <= 0}
             className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? '送信中...' : '入力完了'}

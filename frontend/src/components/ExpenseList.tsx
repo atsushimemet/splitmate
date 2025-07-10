@@ -422,11 +422,8 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                     </button>
                   </div>
 
-                  {/* 2行目：カテゴリ 年月 */}
+                  {/* 2行目：年月 */}
                   <div className="flex items-center gap-2">
-                    <span className="inline-block bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded-full">
-                      {expense.category}
-                    </span>
                     <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
                       {formatMonthYear(expense.expenseYear, expense.expenseMonth)}
                     </span>

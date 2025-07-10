@@ -8,7 +8,6 @@ export interface User {
 
 export interface Expense {
   id: string;
-  category: string;
   description: string;
   amount: number;
   payerId: string; // User ID
@@ -51,7 +50,6 @@ export interface Settlement {
 }
 
 export interface CreateExpenseRequest {
-  category: string;
   description: string;
   amount: number;
   payerId: string;
@@ -82,7 +80,6 @@ export interface MonthlyExpenseSummary {
   totalExpenses: number;
   husbandAmount: number;
   wifeAmount: number;
-  categories: { [category: string]: number };
 }
 
 export interface MonthlyExpenseRequest {

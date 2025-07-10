@@ -24,16 +24,15 @@ export class ExpenseService {
       
       const sql = `
         INSERT INTO expenses (
-          id, category, description, amount, payer_id, expense_year, expense_month, 
+          id, description, amount, payer_id, expense_year, expense_month, 
           custom_husband_ratio, custom_wife_ratio, uses_custom_ratio, 
           created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       
       await pool.execute(sql, [
         id, 
-        data.category, 
         data.description, 
         data.amount, 
         data.payerId, 
@@ -92,7 +91,6 @@ export class ExpenseService {
       
       const expenses: Expense[] = (rows as any[]).map((row: any) => ({
         id: row.id,
-        category: row.category,
         description: row.description,
         amount: row.amount,
         payerId: row.payer_id,
@@ -134,7 +132,6 @@ export class ExpenseService {
       
       const expenses: Expense[] = (rows as any[]).map((row: any) => ({
         id: row.id,
-        category: row.category,
         description: row.description,
         amount: row.amount,
         payerId: row.payer_id,
@@ -179,29 +176,13 @@ export class ExpenseService {
       const [basicRows] = await pool.execute(basicStatsSql, [year, month]);
       const basicStats = (basicRows as any[])[0];
       
-      // カテゴリ別統計を取得
-      const categorySql = `
-        SELECT category, SUM(amount) as amount
-        FROM expenses
-        WHERE expense_year = ? AND expense_month = ?
-        GROUP BY category
-      `;
-      
-      const [categoryRows] = await pool.execute(categorySql, [year, month]);
-      
-      const categories: { [category: string]: number } = {};
-      (categoryRows as any[]).forEach((row: any) => {
-        categories[row.category] = row.amount;
-      });
-      
       const summary: MonthlyExpenseSummary = {
         year,
         month,
         totalAmount: basicStats.total_amount || 0,
         totalExpenses: basicStats.total_expenses || 0,
         husbandAmount: basicStats.husband_amount || 0,
-        wifeAmount: basicStats.wife_amount || 0,
-        categories
+        wifeAmount: basicStats.wife_amount || 0
       };
       
       return {
@@ -311,7 +292,6 @@ export class ExpenseService {
       
       const expense: Expense = {
         id: row.id,
-        category: row.category,
         description: row.description,
         amount: row.amount,
         payerId: row.payer_id,

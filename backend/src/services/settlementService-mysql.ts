@@ -8,7 +8,7 @@ export const settlementService = {
     try {
       // 費用を取得（個別配分比率を含む）
       const expenseQuery = `
-        SELECT id, category, description, amount, payer_id as payerId,
+        SELECT id, description, amount, payer_id as payerId,
                custom_husband_ratio as customHusbandRatio,
                custom_wife_ratio as customWifeRatio,
                uses_custom_ratio as usesCustomRatio,

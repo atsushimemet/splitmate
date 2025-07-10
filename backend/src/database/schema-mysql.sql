@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS allocation_ratios (
 -- Expenses table (with monthly tracking and custom allocation ratios)
 CREATE TABLE IF NOT EXISTS expenses (
   id VARCHAR(255) PRIMARY KEY,
-  category VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
   amount INT NOT NULL CHECK (amount > 0),
   payer_id VARCHAR(255) NOT NULL,

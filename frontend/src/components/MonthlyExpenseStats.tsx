@@ -169,35 +169,7 @@ export const MonthlyExpenseStats: React.FC<MonthlyExpenseStatsProps> = ({
         </div>
       </div>
 
-      {/* カテゴリ別（当月） */}
-      {Object.keys(currentMonth.categories).length > 0 && (
-        <div className="card">
-          <h3 className="text-xl font-bold mb-4 text-gray-800">
-            カテゴリ別支出（{formatMonthYear(currentMonth.year, currentMonth.month)}）
-          </h3>
-          <div className="space-y-3">
-            {Object.entries(currentMonth.categories)
-              .sort(([,a], [,b]) => b - a)
-              .map(([category, amount]) => {
-                const percentage = currentMonth.totalAmount > 0 
-                  ? Math.round((amount / currentMonth.totalAmount) * 100) 
-                  : 0;
-                
-                return (
-                  <div key={category} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium text-gray-800">{category}</span>
-                      <span className="text-sm text-gray-500">({percentage}%)</span>
-                    </div>
-                    <span className="font-bold text-gray-900">
-                      ¥{formatAmount(amount)}
-                    </span>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }; 

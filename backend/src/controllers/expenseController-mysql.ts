@@ -4,7 +4,6 @@ import { ExpenseService } from '../services/expenseService-mysql';
 
 // バリデーションスキーマ
 const createExpenseSchema = z.object({
-  category: z.string().min(1, 'Category is required'),
   description: z.string().min(1, 'Description is required'),
   amount: z.number().positive('Amount must be positive'),
   payerId: z.string().min(1, 'Payer ID is required'),
