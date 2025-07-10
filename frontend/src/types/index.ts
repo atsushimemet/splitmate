@@ -35,9 +35,7 @@ export interface User {
 export interface ExpenseStats {
   totalExpenses: number;
   totalAmount: number;
-  averageAmount: number;
   minAmount: number;
-  maxAmount: number;
 }
 
 export interface AllocationRatio {

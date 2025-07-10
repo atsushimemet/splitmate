@@ -20,9 +20,7 @@ const AppContent = () => {
   const [stats, setStats] = useState<Stats>({
     totalExpenses: 0,
     totalAmount: 0,
-    averageAmount: 0,
-    minAmount: 0,
-    maxAmount: 0
+    minAmount: 0
   });
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
@@ -112,9 +110,7 @@ const AppContent = () => {
         setStats(prev => ({
           totalExpenses: prev.totalExpenses + 1,
           totalAmount: prev.totalAmount + newExpense.amount,
-          averageAmount: (prev.totalAmount + newExpense.amount) / (prev.totalExpenses + 1),
-          minAmount: prev.minAmount === 0 ? newExpense.amount : Math.min(prev.minAmount, newExpense.amount),
-          maxAmount: Math.max(prev.maxAmount, newExpense.amount)
+          minAmount: prev.minAmount === 0 ? newExpense.amount : Math.min(prev.minAmount, newExpense.amount)
         }));
         
         // 精算を自動計算（非同期で実行、状態更新には影響しない）

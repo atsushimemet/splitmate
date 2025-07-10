@@ -376,9 +376,7 @@ export class ExpenseService {
         SELECT 
           COUNT(*) as total_expenses,
           SUM(amount) as total_amount,
-          AVG(amount) as average_amount,
-          MIN(amount) as min_amount,
-          MAX(amount) as max_amount
+          MIN(amount) as min_amount
         FROM expenses
       `;
       
@@ -390,9 +388,7 @@ export class ExpenseService {
         data: {
           totalExpenses: row.total_expenses,
           totalAmount: row.total_amount,
-          averageAmount: Math.round(row.average_amount),
-          minAmount: row.min_amount,
-          maxAmount: row.max_amount
+          minAmount: row.min_amount
         }
       };
     } catch (error) {
