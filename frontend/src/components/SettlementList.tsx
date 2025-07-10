@@ -159,16 +159,18 @@ function FinalSettlementVerificationModal({ settlements, isOpen, onClose }: Fina
   if (!isOpen) return null;
 
   const getCalculationDetails = () => {
-    let husbandTotal = 0;
-    let wifeTotal = 0;
+    let husbandShouldReceive = 0; // 夫が受け取るべき金額（妻からの支払い）
+    let wifeShouldReceive = 0;    // 妻が受け取るべき金額（夫からの支払い）
     
     const details = settlements.map((settlement) => {
       const receiverAmount = settlement.receiver === 'husband' ? settlement.settlementAmount : -settlement.settlementAmount;
       
       if (settlement.receiver === 'husband') {
-        husbandTotal += settlement.settlementAmount;
+        // receiver = husband means 妻が夫に支払うべき
+        husbandShouldReceive += settlement.settlementAmount;
       } else {
-        wifeTotal += settlement.settlementAmount;
+        // receiver = wife means 夫が妻に支払うべき
+        wifeShouldReceive += settlement.settlementAmount;
       }
       
       return {
@@ -184,20 +186,20 @@ function FinalSettlementVerificationModal({ settlements, isOpen, onClose }: Fina
       };
     });
     
-    const finalDirection = husbandTotal > wifeTotal ? {
+    const finalDirection = husbandShouldReceive > wifeShouldReceive ? {
       from: '妻',
       to: '夫', 
-      amount: husbandTotal - wifeTotal
-    } : husbandTotal < wifeTotal ? {
+      amount: husbandShouldReceive - wifeShouldReceive
+    } : wifeShouldReceive > husbandShouldReceive ? {
       from: '夫',
       to: '妻',
-      amount: wifeTotal - husbandTotal
+      amount: wifeShouldReceive - husbandShouldReceive
     } : null;
     
-    return { details, finalDirection, husbandTotal, wifeTotal };
+    return { details, finalDirection, husbandShouldReceive, wifeShouldReceive };
   };
 
-  const { details, finalDirection, husbandTotal, wifeTotal } = getCalculationDetails();
+  const { details, finalDirection, husbandShouldReceive, wifeShouldReceive } = getCalculationDetails();
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -234,7 +236,7 @@ function FinalSettlementVerificationModal({ settlements, isOpen, onClose }: Fina
                         <span className="text-sm font-medium text-gray-900">{detail.description}</span>
                       </div>
                       <div className="text-xs text-gray-600">
-                        {detail.payer} → {detail.receiver}
+                        {detail.receiver} → {detail.payer}
                       </div>
                     </div>
                     <div className="text-right">
@@ -256,11 +258,11 @@ function FinalSettlementVerificationModal({ settlements, isOpen, onClose }: Fina
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-blue-700 font-medium">夫の受け取り合計:</span>
-                <span className="ml-2 text-blue-900 font-bold">¥{husbandTotal.toLocaleString()}</span>
+                <span className="ml-2 text-blue-900 font-bold">¥{husbandShouldReceive.toLocaleString()}</span>
               </div>
               <div>
                 <span className="text-blue-700 font-medium">妻の受け取り合計:</span>
-                <span className="ml-2 text-blue-900 font-bold">¥{wifeTotal.toLocaleString()}</span>
+                <span className="ml-2 text-blue-900 font-bold">¥{wifeShouldReceive.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -403,28 +405,30 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
   const getSettlementDirection = () => {
     const approvedSettlements = getApprovedSettlements();
     
-    let husbandReceives = 0;
-    let wifeReceives = 0;
+    let husbandShouldReceive = 0; // 夫が受け取るべき金額（妻からの支払い）
+    let wifeShouldReceive = 0;    // 妻が受け取るべき金額（夫からの支払い）
     
     approvedSettlements.forEach(settlement => {
       if (settlement.receiver === 'husband') {
-        husbandReceives += settlement.settlementAmount;
+        // receiver = husband means 妻が夫に支払うべき
+        husbandShouldReceive += settlement.settlementAmount;
       } else {
-        wifeReceives += settlement.settlementAmount;
+        // receiver = wife means 夫が妻に支払うべき
+        wifeShouldReceive += settlement.settlementAmount;
       }
     });
     
-    if (husbandReceives > wifeReceives) {
+    if (husbandShouldReceive > wifeShouldReceive) {
       return {
         from: '妻',
         to: '夫',
-        amount: husbandReceives - wifeReceives
+        amount: husbandShouldReceive - wifeShouldReceive
       };
-    } else if (wifeReceives > husbandReceives) {
+    } else if (wifeShouldReceive > husbandShouldReceive) {
       return {
         from: '夫',
         to: '妻',
-        amount: wifeReceives - husbandReceives
+        amount: wifeShouldReceive - husbandShouldReceive
       };
     } else {
       return {
