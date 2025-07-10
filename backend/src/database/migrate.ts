@@ -1,6 +1,6 @@
 import { pool } from './connection-mysql';
 
-export async function runMigration() {
+export async function runMigration(closePool: boolean = false) {
   console.log('🔄 Starting database migration...');
   
   try {
@@ -155,13 +155,15 @@ export async function runMigration() {
     console.error('❌ Migration failed:', error);
     throw error;
   } finally {
-    await pool.end();
+    if (closePool) {
+      await pool.end();
+    }
   }
 }
 
 // Run migration if this file is executed directly
 if (require.main === module) {
-  runMigration()
+  runMigration(true) // closePool = true for command line execution
     .then(() => {
       console.log('🎉 Migration completed successfully');
       process.exit(0);
