@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { AllocationRatio, ApiResponse, CreateExpenseRequest, Expense, ExpenseStats, MonthlyExpenseStats, MonthlyExpenseSummary, Settlement, UpdateAllocationRatioRequest, UpdateExpenseAllocationRatioRequest } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
@@ -197,6 +197,23 @@ export const settlementApi = {
     }
   }
 };
+
+// メール送信API（一時的に無効化）
+// export const emailApi = {
+//   // 精算完了メール送信
+//   sendSettlementCompletionEmail: async (): Promise<ApiResponse<{
+//     emailSent: boolean;
+//     messageId?: string;
+//     sentTo: string;
+//   }>> => {
+//     try {
+//       const response = await api.post('/email/settlement-completion');
+//       return response.data;
+//     } catch (error: any) {
+//       return formatError(error, '精算完了メールの送信に失敗しました');
+//     }
+//   }
+// };
 
 // 認証関連のAPI
 export const auth = {

@@ -18,6 +18,48 @@ interface FinalSettlementVerificationModalProps {
   onClose: () => void;
 }
 
+// 連絡確認ポップアップモーダル
+interface ContactConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+function ContactConfirmModal({ isOpen, onClose, onConfirm }: ContactConfirmModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">精算金額の連絡</h2>
+        </div>
+        
+        <div className="p-6">
+          <p className="text-gray-700 mb-6">
+            精算金額を連絡してください
+          </p>
+          
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 transition-colors"
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={onConfirm}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VerificationModal({ settlement, isOpen, onClose }: VerificationModalProps) {
   if (!isOpen) return null;
 
@@ -303,6 +345,11 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
     settlements: []
   });
 
+  // 精算確定完了後のUX関連の状態管理
+  const [isContactConfirmModalOpen, setIsContactConfirmModalOpen] = useState(false);
+  const [isWaitingForSettlement, setIsWaitingForSettlement] = useState(false);
+  const [isCompletingSettlement, setIsCompletingSettlement] = useState(false);
+
   useEffect(() => {
     loadSettlements();
     loadDefaultAllocationRatio();
@@ -476,6 +523,44 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
       setFinalSettlementVerificationModal({ isOpen: false, settlements: [] });
     };
 
+    // 連絡するボタンのハンドラー
+    const handleContactClick = () => {
+      setIsContactConfirmModalOpen(true);
+    };
+
+    // 連絡確認ポップアップのOKボタンハンドラー
+    const handleContactConfirm = () => {
+      setIsContactConfirmModalOpen(false);
+      setIsWaitingForSettlement(true);
+    };
+
+    // 連絡確認ポップアップのキャンセル/閉じるハンドラー
+    const handleContactCancel = () => {
+      setIsContactConfirmModalOpen(false);
+    };
+
+    // 精算完了ボタンのハンドラー（メール送信機能は一時的に無効化）
+    const handleSettlementComplete = async () => {
+      setIsCompletingSettlement(true);
+      try {
+        console.log('精算完了処理開始...');
+        
+        // メール送信機能は一時的に無効化
+        // const emailResult = await emailApi.sendSettlementCompletionEmail();
+        
+        // 代替処理：単純に精算完了とする
+        alert('精算が完了しました。');
+        setIsWaitingForSettlement(false);
+        
+      } catch (error) {
+        console.error('精算完了エラー:', error);
+        const errorMessage = error instanceof Error ? error.message : '精算完了処理に失敗しました。';
+        alert(errorMessage);
+      } finally {
+        setIsCompletingSettlement(false);
+      }
+    };
+
     return (
       <div className="bg-white rounded-lg shadow-sm border">
         {finalSettlementVerificationModal.isOpen && (
@@ -492,6 +577,11 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
             onClose={handleCloseVerificationModal}
           />
         )}
+        <ContactConfirmModal
+          isOpen={isContactConfirmModalOpen}
+          onClose={handleContactCancel}
+          onConfirm={handleContactConfirm}
+        />
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -526,18 +616,62 @@ export function SettlementList({ onSettlementUpdate }: SettlementListProps) {
                   </p>
                 )}
               </div>
-              <button
-                onClick={() => setFinalSettlementVerificationModal({ isOpen: true, settlements: approvedSettlements })}
-                className="ml-4 inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 transition-colors"
-                title="全体精算ロジックを確認"
-              >
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                検算
-              </button>
+              {!isWaitingForSettlement ? (
+                <button
+                  onClick={handleContactClick}
+                  className="ml-4 inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                  title="精算金額を連絡する"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a2 2 0 01-2-2v-6a2 2 0 012-2h8z" />
+                  </svg>
+                  連絡する
+                </button>
+              ) : (
+                <button
+                  onClick={() => setFinalSettlementVerificationModal({ isOpen: true, settlements: approvedSettlements })}
+                  className="ml-4 inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                  title="全体精算ロジックを確認"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  検算
+                </button>
+              )}
             </div>
           </div>
+
+          {/* 精算待機中メッセージと精算完了ボタン */}
+          {isWaitingForSettlement && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-yellow-800 font-medium">精算待機中</p>
+                </div>
+                <button
+                  onClick={handleSettlementComplete}
+                  disabled={isCompletingSettlement}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isCompletingSettlement ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      処理中...
+                    </>
+                  ) : (
+                    '精算完了'
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
           
           <div className="bg-gray-50 rounded-lg p-4">
             <h4 className="font-medium text-gray-900 mb-2">承認済み精算明細</h4>

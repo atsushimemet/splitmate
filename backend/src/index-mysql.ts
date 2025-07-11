@@ -47,7 +47,8 @@ const corsOrigins = isDevelopment
 
 app.use(cors({
   origin: corsOrigins,
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200 // レガシーブラウザ対応
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -55,7 +56,12 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'your-session-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false } // 本番はtrue+HTTPS推奨
+  cookie: { 
+    secure: false, // 開発環境では false に設定
+    httpOnly: true, // XSS攻撃を防ぐためにhttpOnlyを明示的に設定
+    sameSite: 'lax', // 開発環境では lax に設定
+    maxAge: 24 * 60 * 60 * 1000 // 24時間
+  }
 }));
 app.use(passport.initialize());
 app.use(passport.session());
@@ -82,9 +88,13 @@ app.use('/api/settlements', settlementRoutes);
 
 // Google認証関連のルート
 passport.serializeUser((user: any, done) => {
+  console.log('🔐 SERIALIZE USER - Saving user to session:', user?.displayName);
+  console.log('🔐 SERIALIZE USER - User ID:', user?.id);
   done(null, user);
 });
 passport.deserializeUser((user: any, done) => {
+  console.log('🔓 DESERIALIZE USER - Loading user from session:', user?.displayName);
+  console.log('🔓 DESERIALIZE USER - User ID:', user?.id);
   done(null, user);
 });
 
@@ -103,7 +113,17 @@ passport.use(new GoogleStrategy({
 },
 (accessToken, refreshToken, profile, done) => {
   console.log('OAuth callback received for user:', profile.displayName);
-  return done(null, profile);
+  console.log('OAuth scopes granted:', profile);
+  console.log('Access token available:', !!accessToken);
+  
+  // アクセストークンとリフレッシュトークンをプロフィールに追加
+  const userWithTokens = {
+    ...profile,
+    accessToken,
+    refreshToken
+  };
+  
+  return done(null, userWithTokens);
 }
 ));
 
@@ -119,6 +139,11 @@ app.get('/auth/google/callback',
     session: true
   }),
   (req, res) => {
+    console.log('🎯 AUTH CALLBACK - Authentication successful');
+    console.log('🎯 AUTH CALLBACK - Session ID:', (req as any).sessionID);
+    console.log('🎯 AUTH CALLBACK - Is authenticated:', req.isAuthenticated ? req.isAuthenticated() : 'N/A');
+    console.log('🎯 AUTH CALLBACK - User in session:', req.user?.displayName);
+    
     // 認証成功時のリダイレクト先
     res.redirect(`${frontendUrl}/auth/callback`);
   }
@@ -126,6 +151,14 @@ app.get('/auth/google/callback',
 
 // 認証状態確認
 app.get('/auth/status', (req, res) => {
+  console.log('AUTH STATUS CHECK:');
+  console.log('- Session ID:', (req as any).sessionID);
+  console.log('- Session data:', (req as any).session);
+  console.log('- isAuthenticated function exists:', typeof req.isAuthenticated);
+  console.log('- isAuthenticated result:', req.isAuthenticated ? req.isAuthenticated() : 'function not available');
+  console.log('- User data:', req.user);
+  console.log('- Cookie header:', req.headers.cookie);
+  
   if (req.isAuthenticated && req.isAuthenticated()) {
     res.json({ authenticated: true, user: req.user });
   } else {
