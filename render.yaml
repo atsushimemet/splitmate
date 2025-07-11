@@ -3,6 +3,7 @@ services:
     name: splitmate-backend
     runtime: docker
     dockerfilePath: ./backend/Dockerfile.prod
+    dockerContext: .
     buildCommand: ""
     startCommand: ""
     plan: free

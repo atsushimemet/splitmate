@@ -7,18 +7,24 @@ RUN apk add --no-cache wget
 # Set working directory
 WORKDIR /app
 
-# Copy root package files first for better caching
-COPY package.json package-lock.json ./
-COPY backend/package.json ./backend/
+# Copy backend package files first for better caching
+COPY backend/package.json backend/package-lock.json ./
 
-# Install dependencies for backend workspace
-RUN npm ci --workspace=backend --only=production
+# Install dependencies directly in the backend directory
+RUN npm ci --only=production
 
-# Copy backend source code
-COPY backend ./backend
+# Install TypeScript globally for building
+RUN npm install -g typescript
+
+# Copy backend source code and configuration
+COPY backend/src ./src
+COPY backend/tsconfig.json ./
+
+# Create dist/database directory for schema files
+RUN mkdir -p dist/database
 
 # Build the TypeScript code
-RUN npm run build --workspace=backend
+RUN npm run build
 
 # Expose port
 EXPOSE 3001
@@ -28,4 +34,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
 
 # Start the production server for PostgreSQL
-CMD ["npm", "run", "start:postgres", "--workspace=backend"] 
+CMD ["npm", "run", "start:postgres"] 
