@@ -1,11 +1,11 @@
 [build]
   base = "frontend"
   publish = "dist"
-  command = "npm ci && npm run build"
+  command = "npm ci --include=dev && npm run build"
 
 [build.environment]
   NODE_VERSION = "22"
-  NPM_FLAGS = "--production=false"
+  NPM_FLAGS = "--include=dev"
 
 # SPA用のリダイレクト設定
 [[redirects]]
