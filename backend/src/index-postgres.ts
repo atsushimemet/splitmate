@@ -1,3 +1,4 @@
+import pgSession from 'connect-pg-simple';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
@@ -34,8 +35,19 @@ console.log('Environment Variables:', {
   BACKEND_URL: process.env.BACKEND_URL,
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET',
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET',
-  SESSION_SECRET: process.env.SESSION_SECRET ? 'SET' : 'NOT SET'
+  SESSION_SECRET: process.env.SESSION_SECRET ? 'SET' : 'NOT SET',
+  DATABASE_URL: process.env.DATABASE_URL ? 'SET' : 'NOT SET',
+  PORT: process.env.PORT || 'NOT SET'
 });
+
+// Additional debugging for production
+if (process.env.NODE_ENV === 'production') {
+  console.log('🔍 PRODUCTION DEBUG INFO:');
+  console.log('- Frontend URL:', process.env.FRONTEND_URL);
+  console.log('- Backend URL:', process.env.BACKEND_URL);
+  console.log('- Google Client ID (first 10 chars):', process.env.GOOGLE_CLIENT_ID?.substring(0, 10) || 'NOT SET');
+  console.log('- Session Secret (first 10 chars):', process.env.SESSION_SECRET?.substring(0, 10) || 'NOT SET');
+}
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -64,8 +76,23 @@ app.use(helmet({
 }));
 
 // CORS configuration
+const corsOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  frontendUrl
+];
+
+// 本番環境では、Netlifyのドメインを明示的に追加
+if (process.env.NODE_ENV === 'production') {
+  corsOrigins.push('https://soft-malabi-2005f0.netlify.app');
+}
+
+console.log('🔧 CORS CONFIGURATION:');
+console.log('- Origins:', corsOrigins);
+console.log('- Credentials:', true);
+
 app.use(cors({
-  origin: frontendUrl,
+  origin: corsOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -76,7 +103,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Session configuration
-app.use(session({
+const PgSession = pgSession(session);
+
+// セッションストアの設定
+const sessionStore = new PgSession({
+  pool: pool,
+  tableName: 'user_sessions',
+  createTableIfMissing: true
+});
+
+console.log('🔧 SESSION STORE CONFIGURATION:');
+console.log('- Store type:', process.env.NODE_ENV === 'production' ? 'PostgreSQL' : 'Memory');
+console.log('- Database URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
+
+const sessionConfig = {
+  store: process.env.NODE_ENV === 'production' ? sessionStore : undefined,
   secret: process.env.SESSION_SECRET!,
   resave: false,
   saveUninitialized: false,
@@ -84,10 +125,20 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', // HTTPS in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Cross-site for production
+    sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax' | 'strict', // Cross-site for production
     domain: process.env.NODE_ENV === 'production' ? undefined : undefined // Let browser handle domain
-  }
-}));
+  },
+  name: 'connect.sid'
+};
+
+console.log('🔧 SESSION CONFIGURATION:');
+console.log('- Store:', sessionConfig.store ? 'PostgreSQL' : 'Memory');
+console.log('- Secure:', sessionConfig.cookie.secure);
+console.log('- HttpOnly:', sessionConfig.cookie.httpOnly);
+console.log('- SameSite:', sessionConfig.cookie.sameSite);
+console.log('- MaxAge:', sessionConfig.cookie.maxAge);
+
+app.use(session(sessionConfig));
 
 // Passport configuration
 app.use(passport.initialize());
@@ -101,13 +152,17 @@ console.log('CallbackURL:', `${backendUrl}/auth/google/callback`);
 console.log('======================================');
 
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  console.log('🔧 GOOGLE OAUTH STRATEGY SETUP:');
+  console.log('- Client ID:', process.env.GOOGLE_CLIENT_ID?.substring(0, 10) + '...');
+  console.log('- Callback URL:', `${backendUrl}/auth/google/callback`);
+  
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: `${backendUrl}/auth/google/callback`
   }, async (accessToken, refreshToken, profile, done) => {
     try {
-      console.log('Google OAuth callback received:', {
+      console.log('🎯 Google OAuth callback received:', {
         id: profile.id,
         displayName: profile.displayName,
         email: profile.emails?.[0]?.value
@@ -116,17 +171,19 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       // ユーザー情報をデータベースに保存
       const userResult = await UserService.upsertGoogleUser(profile);
       if (userResult.success) {
-        console.log('User saved to database:', userResult.data?.name);
+        console.log('✅ User saved to database:', userResult.data?.name);
         return done(null, profile);
       } else {
-        console.error('Failed to save user to database:', userResult.error);
+        console.error('❌ Failed to save user to database:', userResult.error);
         return done(null, profile); // 認証は成功として扱う
       }
     } catch (error) {
-      console.error('Error in Google OAuth callback:', error);
+      console.error('💥 Error in Google OAuth callback:', error);
       return done(error, null);
     }
   }));
+} else {
+  console.error('❌ GOOGLE OAUTH NOT CONFIGURED - Missing CLIENT_ID or CLIENT_SECRET');
 }
 
 // Passport serialization
@@ -165,9 +222,21 @@ app.get('/auth/google/callback',
     console.log('🎯 AUTH CALLBACK - Session ID:', req.sessionID);
     console.log('🎯 AUTH CALLBACK - Is authenticated:', req.isAuthenticated ? req.isAuthenticated() : 'N/A');
     console.log('🎯 AUTH CALLBACK - User in session:', req.user?.displayName);
+    console.log('🎯 AUTH CALLBACK - User ID:', req.user?.id);
+    console.log('🎯 AUTH CALLBACK - Session data:', req.session);
+    console.log('🎯 AUTH CALLBACK - Session store type:', req.session.store ? 'PostgreSQL' : 'Memory');
+    console.log('🎯 AUTH CALLBACK - Cookie settings:', req.session.cookie);
     console.log('🎯 AUTH CALLBACK - Redirect URL will be:', `${frontendUrl}/auth/callback`);
     
-    res.redirect(`${frontendUrl}/auth/callback`);
+    // セッションを明示的に保存
+    req.session.save((err: any) => {
+      if (err) {
+        console.error('❌ Session save error:', err);
+      } else {
+        console.log('✅ Session saved successfully');
+      }
+      res.redirect(`${frontendUrl}/auth/callback`);
+    });
   }
 );
 

@@ -16,6 +16,7 @@
     "lint": "npm run lint --workspaces"
   },
   "devDependencies": {
+    "@types/connect-pg-simple": "^7.0.3",
     "concurrently": "^8.2.2"
   },
   "keywords": [
@@ -26,5 +27,8 @@
     "finance"
   ],
   "author": "SplitMate Team",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "connect-pg-simple": "^10.0.0"
+  }
 }
