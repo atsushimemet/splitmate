@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export const AuthCallback = () => {
-  const { checkAuthStatus } = useAuth();
+  const { checkAuthStatus, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -14,8 +14,20 @@ export const AuthCallback = () => {
     const handleCallback = async () => {
       console.log('AuthCallback: 認証処理を開始します');
       try {
+        // 直接APIで認証状態を確認
+        const authStatus = await auth.checkAuthStatus();
+        console.log('AuthCallback: 認証状態の確認が完了しました', authStatus);
+        
+        // AuthContextの状態も更新
         await checkAuthStatus();
-        console.log('AuthCallback: 認証状態の確認が完了しました');
+        
+        // デバッグ: 認証成功時は成功メッセージを表示
+        if (authStatus.authenticated) {
+          alert(`認証が成功しました！ユーザー: ${authStatus.user?.displayName}`); // 一時的なデバッグ用
+        } else {
+          alert('認証に失敗しました'); // 一時的なデバッグ用
+        }
+        
         // 認証状態を更新後、トップページにリダイレクト
         console.log('AuthCallback: トップページにリダイレクトします');
         navigate('/', { replace: true });
