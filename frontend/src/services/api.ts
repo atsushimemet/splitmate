@@ -236,8 +236,8 @@ export const auth = {
   // ログアウト
   logout: async (): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await authApi.get('/auth/logout');
-      return response.data;
+      const response = await authApi.post('/auth/logout');
+      return { success: true };
     } catch (error: any) {
       console.error('Logout failed:', error);
       return { 

@@ -23,15 +23,6 @@ export const AuthCallback = () => {
         // デバッグ: 認証状態を確認
         console.log('AuthCallback: 認証状態チェック後 - isAuthenticated:', isAuthenticated);
         
-        // 一時的なデバッグ用アラート
-        if (isAuthenticated) {
-          console.log('AuthCallback: 認証成功！リダイレクトします');
-          alert('認証が成功しました！');
-        } else {
-          console.log('AuthCallback: 認証失敗。リダイレクトします');
-          alert('認証に失敗しました');
-        }
-        
         // 認証状態を更新後、トップページにリダイレクト
         console.log('AuthCallback: トップページにリダイレクトします');
         navigate('/', { replace: true });
