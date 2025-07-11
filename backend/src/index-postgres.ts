@@ -39,9 +39,9 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: { 
-    secure: false, // 開発環境では false に設定
+    secure: !isDevelopment, // 本番環境では true に設定
     httpOnly: true, // XSS攻撃を防ぐためにhttpOnlyを明示的に設定
-    sameSite: 'lax', // 開発環境では lax に設定
+    sameSite: isDevelopment ? 'lax' : 'none', // 本番環境では none に設定（クロスサイトの場合）
     maxAge: 24 * 60 * 60 * 1000 // 24時間
   }
 }));
@@ -135,9 +135,9 @@ app.get('/auth/google/callback',
     failureRedirect: `${frontendUrl}/`,
     session: true
   }),
-  (req, res) => {
+  (req: any, res) => {
     console.log('🎯 AUTH CALLBACK - Authentication successful');
-    console.log('🎯 AUTH CALLBACK - Session ID:', (req as any).sessionID);
+    console.log('🎯 AUTH CALLBACK - Session ID:', req.sessionID);
     console.log('🎯 AUTH CALLBACK - Is authenticated:', req.isAuthenticated ? req.isAuthenticated() : 'N/A');
     console.log('🎯 AUTH CALLBACK - User in session:', req.user?.displayName);
     console.log('🎯 AUTH CALLBACK - FRONTEND_URL env var:', process.env.FRONTEND_URL);
@@ -150,10 +150,10 @@ app.get('/auth/google/callback',
 );
 
 // 認証状態確認
-app.get('/auth/status', (req, res) => {
+app.get('/auth/status', (req: any, res) => {
   console.log('AUTH STATUS CHECK:');
-  console.log('- Session ID:', (req as any).sessionID);
-  console.log('- Session data:', (req as any).session);
+  console.log('- Session ID:', req.sessionID);
+  console.log('- Session data:', req.session);
   console.log('- isAuthenticated function exists:', typeof req.isAuthenticated);
   console.log('- isAuthenticated result:', req.isAuthenticated ? req.isAuthenticated() : 'function not available');
   console.log('- User data:', req.user);
@@ -167,7 +167,7 @@ app.get('/auth/status', (req, res) => {
 });
 
 // ログアウト
-app.get('/auth/logout', (req, res) => {
+app.get('/auth/logout', (req: any, res) => {
   if (req.logout) {
     req.logout(() => {
       res.json({ success: true });
