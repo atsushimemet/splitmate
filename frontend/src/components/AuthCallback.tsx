@@ -14,18 +14,22 @@ export const AuthCallback = () => {
     const handleCallback = async () => {
       console.log('AuthCallback: 認証処理を開始します');
       try {
-        // 直接APIで認証状態を確認
-        const authStatus = await auth.checkAuthStatus();
-        console.log('AuthCallback: 認証状態の確認が完了しました', authStatus);
-        
-        // AuthContextの状態も更新
+        // AuthContextの状態を更新
         await checkAuthStatus();
         
-        // デバッグ: 認証成功時は成功メッセージを表示
-        if (authStatus.authenticated) {
-          alert(`認証が成功しました！ユーザー: ${authStatus.user?.displayName}`); // 一時的なデバッグ用
+        // 状態更新を少し待つ
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // デバッグ: 認証状態を確認
+        console.log('AuthCallback: 認証状態チェック後 - isAuthenticated:', isAuthenticated);
+        
+        // 一時的なデバッグ用アラート
+        if (isAuthenticated) {
+          console.log('AuthCallback: 認証成功！リダイレクトします');
+          alert('認証が成功しました！');
         } else {
-          alert('認証に失敗しました'); // 一時的なデバッグ用
+          console.log('AuthCallback: 認証失敗。リダイレクトします');
+          alert('認証に失敗しました');
         }
         
         // 認証状態を更新後、トップページにリダイレクト
