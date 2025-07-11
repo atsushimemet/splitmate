@@ -4,8 +4,6 @@ services:
     runtime: docker
     dockerfilePath: ./backend/Dockerfile.prod
     dockerContext: .
-    buildCommand: ""
-    startCommand: ""
     plan: free
     env:
       - key: NODE_ENV

@@ -1,0 +1,9 @@
+frontend/
+docs/
+infra/
+scripts/
+README.md
+docker-compose*.yml
+.git/
+.gitignore
+*.md 
