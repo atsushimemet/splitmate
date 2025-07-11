@@ -66,21 +66,25 @@ END;
 $$ language 'plpgsql';
 
 -- Triggers to automatically update updated_at column
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at 
     BEFORE UPDATE ON users 
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_allocation_ratios_updated_at ON allocation_ratios;
 CREATE TRIGGER update_allocation_ratios_updated_at 
     BEFORE UPDATE ON allocation_ratios 
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_expenses_updated_at ON expenses;
 CREATE TRIGGER update_expenses_updated_at 
     BEFORE UPDATE ON expenses 
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_settlements_updated_at ON settlements;
 CREATE TRIGGER update_settlements_updated_at 
     BEFORE UPDATE ON settlements 
     FOR EACH ROW 
