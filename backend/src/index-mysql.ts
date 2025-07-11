@@ -38,8 +38,8 @@ const PORT = process.env.PORT || 3001;
 app.use(helmet());
 // 開発環境かどうかを判定
 const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
-const frontendUrl = process.env.FRONTEND_URL || (isDevelopment ? 'http://localhost:3000' : 'http://splitmate-alb-906594043.ap-northeast-1.elb.amazonaws.com');
-const backendUrl = process.env.BACKEND_URL || (isDevelopment ? 'http://localhost:3001' : 'http://splitmate-alb-906594043.ap-northeast-1.elb.amazonaws.com');
+const frontendUrl = process.env.FRONTEND_URL || (isDevelopment ? 'http://localhost:3000' : 'http://splitmate-alb-111394655.ap-northeast-1.elb.amazonaws.com');
+const backendUrl = process.env.BACKEND_URL || (isDevelopment ? 'http://localhost:3001' : 'http://splitmate-alb-111394655.ap-northeast-1.elb.amazonaws.com');
 
 const corsOrigins = isDevelopment 
   ? ['http://localhost:3000', 'http://localhost:5173']
@@ -98,13 +98,28 @@ passport.deserializeUser((user: any, done) => {
   done(null, user);
 });
 
-console.log('OAuth Configuration:', {
+console.log('==================== ENVIRONMENT DEBUG ====================');
+console.log('Environment Variables:', {
   NODE_ENV: process.env.NODE_ENV,
+  FRONTEND_URL: process.env.FRONTEND_URL,
+  BACKEND_URL: process.env.BACKEND_URL,
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET',
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET',
+  SESSION_SECRET: process.env.SESSION_SECRET ? 'SET' : 'NOT SET'
+});
+console.log('Computed Values:', {
   isDevelopment,
   frontendUrl,
   backendUrl,
   callbackURL: `${backendUrl}/auth/google/callback`
 });
+console.log('==========================================================');
+
+console.log('=== GOOGLE STRATEGY CONFIGURATION ===');
+console.log('ClientID:', process.env.GOOGLE_CLIENT_ID ? `${process.env.GOOGLE_CLIENT_ID.substring(0, 10)}...` : 'NOT SET');
+console.log('ClientSecret:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET');
+console.log('CallbackURL:', `${backendUrl}/auth/google/callback`);
+console.log('======================================');
 
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID!,
@@ -143,6 +158,9 @@ app.get('/auth/google/callback',
     console.log('🎯 AUTH CALLBACK - Session ID:', (req as any).sessionID);
     console.log('🎯 AUTH CALLBACK - Is authenticated:', req.isAuthenticated ? req.isAuthenticated() : 'N/A');
     console.log('🎯 AUTH CALLBACK - User in session:', req.user?.displayName);
+    console.log('🎯 AUTH CALLBACK - FRONTEND_URL env var:', process.env.FRONTEND_URL);
+    console.log('🎯 AUTH CALLBACK - Computed frontendUrl:', frontendUrl);
+    console.log('🎯 AUTH CALLBACK - Redirect URL will be:', `${frontendUrl}/auth/callback`);
     
     // 認証成功時のリダイレクト先
     res.redirect(`${frontendUrl}/auth/callback`);
