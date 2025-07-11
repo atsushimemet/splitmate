@@ -19,6 +19,9 @@ export interface Expense {
   usesCustomRatio: boolean;
   createdAt: Date;
   updatedAt: Date;
+  // Payer information (populated from JOIN with users table)
+  payerName?: string;
+  payerRole?: 'husband' | 'wife';
 }
 
 export interface AllocationRatio {

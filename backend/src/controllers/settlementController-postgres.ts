@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { settlementService } from '../services/settlementService-postgres';
+import { SettlementService } from '../services/settlementService-postgres';
 
 export class SettlementController {
   /**
@@ -16,7 +16,7 @@ export class SettlementController {
         });
       }
 
-      const result = await settlementService.calculateSettlement(expenseId);
+      const result = await SettlementService.calculateSettlement(expenseId);
       
       if (result.success) {
         res.status(200).json(result);
@@ -48,12 +48,12 @@ export class SettlementController {
         });
       }
 
-      const result = await settlementService.approveSettlement(settlementId);
+      const result = await SettlementService.updateSettlementStatus(settlementId, 'approved');
       
       if (result.success) {
         res.status(200).json(result);
       } else {
-        res.status(400).json(result);
+        res.status(404).json(result);
       }
       return;
     } catch (error) {
@@ -80,12 +80,12 @@ export class SettlementController {
         });
       }
 
-      const result = await settlementService.completeSettlement(settlementId);
+      const result = await SettlementService.updateSettlementStatus(settlementId, 'completed');
       
       if (result.success) {
         res.status(200).json(result);
       } else {
-        res.status(400).json(result);
+        res.status(404).json(result);
       }
       return;
     } catch (error) {
@@ -103,7 +103,7 @@ export class SettlementController {
    */
   static async getAllSettlements(req: Request, res: Response) {
     try {
-      const result = await settlementService.getAllSettlements();
+      const result = await SettlementService.getAllSettlements();
       
       if (result.success) {
         res.status(200).json(result);
@@ -122,20 +122,28 @@ export class SettlementController {
   }
 
   /**
-   * 精算を削除
+   * 精算のステータスを更新
    */
-  static async deleteSettlement(req: Request, res: Response) {
+  static async updateSettlementStatus(req: Request, res: Response) {
     try {
-      const { settlementId } = req.params;
+      const { id } = req.params;
+      const { status } = req.body;
       
-      if (!settlementId) {
+      if (!id) {
         return res.status(400).json({
           success: false,
           error: 'Settlement ID is required'
         });
       }
 
-      const result = await settlementService.deleteSettlement(settlementId);
+      if (!status || !['pending', 'approved', 'completed'].includes(status)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Valid status is required (pending, approved, completed)'
+        });
+      }
+
+      const result = await SettlementService.updateSettlementStatus(id, status);
       
       if (result.success) {
         res.status(200).json(result);
@@ -144,7 +152,7 @@ export class SettlementController {
       }
       return;
     } catch (error) {
-      console.error('Error deleting settlement:', error);
+      console.error('Error updating settlement status:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error'

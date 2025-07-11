@@ -1,118 +1,50 @@
-import fs from 'fs';
-import path from 'path';
-import { Pool, PoolConfig } from 'pg';
+import dotenv from 'dotenv';
+import { Pool } from 'pg';
 
-// PostgreSQL connection configuration
-const dbConfig: PoolConfig = {
+dotenv.config();
+
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-};
+});
 
-// Create connection pool
-export const pool = new Pool(dbConfig);
+// Test connection
+pool.on('connect', () => {
+  console.log('Connected to PostgreSQL database');
+});
 
-// Test database connection
-export async function testConnection(): Promise<boolean> {
+pool.on('error', (err) => {
+  console.error('PostgreSQL connection error:', err);
+});
+
+// Function to seed initial data if the database is empty
+export async function seedInitialData() {
   try {
-    const client = await pool.connect();
-    await client.query('SELECT NOW()');
-    client.release();
-    console.log('✅ Connected to PostgreSQL database');
-    return true;
+    // Check if users table has any data
+    const userResult = await pool.query('SELECT COUNT(*) FROM users');
+    const userCount = parseInt(userResult.rows[0].count);
+    
+    if (userCount === 0) {
+      console.log('Database is empty. Seeding initial data...');
+      
+      // Insert initial users
+      await pool.query(`
+        INSERT INTO users (id, name, role) VALUES 
+        ('husband', '夫', 'husband'),
+        ('wife', '妻', 'wife')
+      `);
+      
+      // Insert default allocation ratio
+      await pool.query(`
+        INSERT INTO allocation_ratios (id, husband_ratio, wife_ratio) VALUES 
+        ('default', 0.50, 0.50)
+      `);
+      
+      console.log('Initial data seeded successfully');
+    }
   } catch (error) {
-    console.error('❌ Failed to connect to PostgreSQL database:', error);
-    return false;
+    console.error('Error seeding initial data:', error);
   }
 }
 
-// Initialize database schema
-export async function initializeDatabase(): Promise<void> {
-  try {
-    const schemaPath = path.join(__dirname, 'postgres-schema.sql');
-    const schema = fs.readFileSync(schemaPath, 'utf8');
-    
-    // Execute schema creation
-    await pool.query(schema);
-    console.log('✅ PostgreSQL database schema initialized successfully');
-  } catch (error) {
-    console.error('❌ Failed to initialize PostgreSQL database schema:', error);
-    throw error;
-  }
-}
-
-// Graceful shutdown
-export async function closeConnection(): Promise<void> {
-  try {
-    await pool.end();
-    console.log('✅ PostgreSQL connection pool closed');
-  } catch (error) {
-    console.error('❌ Error closing PostgreSQL connection pool:', error);
-  }
-}
-
-// Health check for monitoring
-export async function healthCheck(): Promise<{
-  status: 'healthy' | 'unhealthy';
-  message: string;
-  timestamp: Date;
-}> {
-  try {
-    const client = await pool.connect();
-    const result = await client.query('SELECT COUNT(*) as table_count FROM information_schema.tables WHERE table_schema = $1', ['public']);
-    client.release();
-    
-    return {
-      status: 'healthy',
-      message: `PostgreSQL connection healthy. Found ${result.rows[0].table_count} tables.`,
-      timestamp: new Date()
-    };
-  } catch (error) {
-    return {
-      status: 'unhealthy',
-      message: `PostgreSQL connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      timestamp: new Date()
-    };
-  }
-}
-
-// Database statistics for monitoring
-export async function getDatabaseStats(): Promise<{
-  totalTables: number;
-  totalConnections: number;
-  databaseSize: string;
-}> {
-  try {
-    const client = await pool.connect();
-    
-    // Get table count
-    const tableResult = await client.query(
-      'SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = $1',
-      ['public']
-    );
-    
-    // Get active connections
-    const connectionResult = await client.query(
-      'SELECT COUNT(*) as count FROM pg_stat_activity WHERE state = $1',
-      ['active']
-    );
-    
-    // Get database size
-    const sizeResult = await client.query(
-      'SELECT pg_size_pretty(pg_database_size(current_database())) as size'
-    );
-    
-    client.release();
-    
-    return {
-      totalTables: parseInt(tableResult.rows[0].count),
-      totalConnections: parseInt(connectionResult.rows[0].count),
-      databaseSize: sizeResult.rows[0].size
-    };
-  } catch (error) {
-    console.error('❌ Failed to get database statistics:', error);
-    throw error;
-  }
-} 
+export default pool; 

@@ -107,8 +107,17 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
     return new Intl.NumberFormat('ja-JP').format(amount);
   };
 
-  const getPayerName = (payerId: string) => {
-    return payerId === 'husband-001' ? '夫' : '妻';
+  const getPayerName = (expense: Expense) => {
+    // バックエンドから取得したユーザー情報を使用
+    if (expense.payerName) {
+      return expense.payerName;
+    }
+    // フォールバック: ロール情報がある場合
+    if (expense.payerRole) {
+      return expense.payerRole === 'husband' ? '夫' : '妻';
+    }
+    // 最終フォールバック: payerIdから判定
+    return expense.payerId === 'husband' ? '夫' : '妻';
   };
 
   const formatMonthYear = (year: number, month: number) => {
@@ -428,7 +437,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                       {formatMonthYear(expense.expenseYear, expense.expenseMonth)}
                     </span>
                     <span className="text-sm text-gray-500">
-                      {getPayerName(expense.payerId)}
+                      {getPayerName(expense)}
                     </span>
                     {isApproved && (
                       <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
