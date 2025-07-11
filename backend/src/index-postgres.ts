@@ -153,8 +153,8 @@ app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'em
 app.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: `${frontendUrl}/login` }),
   (req, res) => {
-    console.log('Google OAuth callback successful, redirecting to:', frontendUrl);
-    res.redirect(frontendUrl);
+    console.log('Google OAuth callback successful, redirecting to:', `${frontendUrl}/auth/callback`);
+    res.redirect(`${frontendUrl}/auth/callback`);
   }
 );
 
