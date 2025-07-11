@@ -81,10 +81,11 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // Set to true in production with HTTPS
+    secure: process.env.NODE_ENV === 'production', // HTTPS in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'lax'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Cross-site for production
+    domain: process.env.NODE_ENV === 'production' ? undefined : undefined // Let browser handle domain
   }
 }));
 
@@ -130,10 +131,14 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
 // Passport serialization
 passport.serializeUser((user: any, done) => {
+  console.log('🔐 SERIALIZE USER - Saving user to session:', user?.displayName);
+  console.log('🔐 SERIALIZE USER - User ID:', user?.id);
   done(null, user);
 });
 
 passport.deserializeUser((user: any, done) => {
+  console.log('🔓 DESERIALIZE USER - Loading user from session:', user?.displayName);
+  console.log('🔓 DESERIALIZE USER - User ID:', user?.id);
   done(null, user);
 });
 
@@ -151,9 +156,17 @@ app.use('/api/settlements', settlementRoutes);
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 app.get('/auth/google/callback', 
-  passport.authenticate('google', { failureRedirect: `${frontendUrl}/login` }),
-  (req, res) => {
-    console.log('Google OAuth callback successful, redirecting to:', `${frontendUrl}/auth/callback`);
+  passport.authenticate('google', { 
+    failureRedirect: `${frontendUrl}/login`,
+    session: true
+  }),
+  (req: any, res) => {
+    console.log('🎯 AUTH CALLBACK - Authentication successful');
+    console.log('🎯 AUTH CALLBACK - Session ID:', req.sessionID);
+    console.log('🎯 AUTH CALLBACK - Is authenticated:', req.isAuthenticated ? req.isAuthenticated() : 'N/A');
+    console.log('🎯 AUTH CALLBACK - User in session:', req.user?.displayName);
+    console.log('🎯 AUTH CALLBACK - Redirect URL will be:', `${frontendUrl}/auth/callback`);
+    
     res.redirect(`${frontendUrl}/auth/callback`);
   }
 );
@@ -176,16 +189,19 @@ app.post('/auth/logout', (req: any, res) => {
 });
 
 app.get('/auth/status', (req: any, res) => {
-  console.log('Auth status check:', {
-    isAuthenticated: req.isAuthenticated(),
-    user: req.user ? 'Present' : 'Not present',
-    sessionID: req.sessionID
-  });
+  console.log('AUTH STATUS CHECK:');
+  console.log('- Session ID:', req.sessionID);
+  console.log('- Session data:', req.session);
+  console.log('- isAuthenticated function exists:', typeof req.isAuthenticated);
+  console.log('- isAuthenticated result:', req.isAuthenticated ? req.isAuthenticated() : 'function not available');
+  console.log('- User data:', req.user);
+  console.log('- Cookie header:', req.headers.cookie);
   
-  res.json({
-    authenticated: req.isAuthenticated(),
-    user: req.user || null
-  });
+  if (req.isAuthenticated && req.isAuthenticated()) {
+    res.json({ authenticated: true, user: req.user });
+  } else {
+    res.json({ authenticated: false });
+  }
 });
 
 // Start server
