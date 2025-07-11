@@ -10,24 +10,6 @@ import allocationRatioRoutes from './routes/allocationRatioRoutes-postgres';
 import expenseRoutes from './routes/expenseRoutes-postgres';
 import settlementRoutes from './routes/settlementRoutes-postgres';
 
-declare global {
-  namespace Express {
-    interface User {
-      // 必要に応じて型を拡張
-      id?: string;
-      displayName?: string;
-      emails?: { value: string }[];
-      photos?: { value: string }[];
-      [key: string]: any;
-    }
-    interface Request {
-      user?: User;
-      isAuthenticated?: () => boolean;
-      logout?: (callback: (err?: any) => void) => void;
-    }
-  }
-}
-
 // 環境変数の読み込み
 dotenv.config();
 
