@@ -1,18 +1,7 @@
 import axios from 'axios';
 import { AllocationRatio, ApiResponse, CreateExpenseRequest, Expense, ExpenseStats, MonthlyExpenseStats, MonthlyExpenseSummary, Settlement, UpdateAllocationRatioRequest, UpdateExpenseAllocationRatioRequest } from '../types';
 
-// 環境変数の詳細ログを出力
-console.log('🔍 API CONFIGURATION DEBUG:');
-console.log('- import.meta.env.VITE_API_URL:', import.meta.env.VITE_API_URL);
-console.log('- import.meta.env.VITE_BACKEND_URL:', import.meta.env.VITE_BACKEND_URL);
-console.log('- NODE_ENV:', import.meta.env.NODE_ENV);
-console.log('- MODE:', import.meta.env.MODE);
-console.log('- PROD:', import.meta.env.PROD);
-console.log('- DEV:', import.meta.env.DEV);
-
 const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
-
-console.log('🎯 COMPUTED API_BASE_URL:', API_BASE_URL);
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
@@ -43,14 +32,9 @@ export const expenseApi = {
   // 費用を作成
   createExpense: async (data: CreateExpenseRequest): Promise<ApiResponse<Expense>> => {
     try {
-      console.log('Creating expense with data:', data);
-      console.log('API base URL:', api.defaults.baseURL);
       const response = await api.post('/expenses', data);
-      console.log('Expense created successfully:', response.data);
       return response.data;
     } catch (error: any) {
-      console.error('Error creating expense:', error);
-      console.error('Error response:', error.response?.data);
       return formatError(error, '費用の作成に失敗しました');
     }
   },
@@ -230,22 +214,10 @@ export const settlementApi = {
 export const auth = {
   // 認証状態を確認
   checkAuthStatus: async (): Promise<{ authenticated: boolean; user?: any }> => {
-    console.log('🔍 AUTH STATUS CHECK:');
-    console.log('- API_BASE_URL:', API_BASE_URL);
-    console.log('- Request URL:', `${API_BASE_URL}/auth/status`);
-    console.log('- withCredentials:', true);
-    
     try {
       const response = await authApi.get('/auth/status');
-      console.log('✅ Auth status response:', response.data);
-      console.log('- Response status:', response.status);
-      console.log('- Response headers:', response.headers);
       return response.data;
     } catch (error: any) {
-      console.error('❌ Auth status check failed:', error);
-      console.error('- Error status:', error.response?.status);
-      console.error('- Error data:', error.response?.data);
-      console.error('- Error message:', error.message);
       return { authenticated: false };
     }
   },
@@ -253,25 +225,15 @@ export const auth = {
   // Googleログインページにリダイレクト
   loginWithGoogle: () => {
     const loginUrl = `${API_BASE_URL}/auth/google`;
-    console.log('🔍 GOOGLE LOGIN REDIRECT:');
-    console.log('- Login URL:', loginUrl);
     window.location.href = loginUrl;
   },
 
   // ログアウト
   logout: async (): Promise<{ success: boolean; error?: string }> => {
-    console.log('🔍 LOGOUT REQUEST:');
-    console.log('- API_BASE_URL:', API_BASE_URL);
-    console.log('- Request URL:', `${API_BASE_URL}/auth/logout`);
-    
     try {
       const response = await authApi.post('/auth/logout');
-      console.log('✅ Logout response:', response.data);
       return { success: true };
     } catch (error: any) {
-      console.error('❌ Logout failed:', error);
-      console.error('- Error status:', error.response?.status);
-      console.error('- Error data:', error.response?.data);
       return { 
         success: false, 
         error: error.response?.data?.error || 'ログアウトに失敗しました'
