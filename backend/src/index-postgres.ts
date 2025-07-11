@@ -150,52 +150,42 @@ app.use('/api/settlements', settlementRoutes);
 // Auth routes
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-// Google認証コールバック
-app.get('/auth/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: `${frontendUrl}/`,
-    session: true
-  }),
-  (req: any, res) => {
-    console.log('🎯 AUTH CALLBACK - Authentication successful');
-    console.log('🎯 AUTH CALLBACK - Session ID:', req.sessionID);
-    console.log('🎯 AUTH CALLBACK - Is authenticated:', req.isAuthenticated ? req.isAuthenticated() : 'N/A');
-    console.log('🎯 AUTH CALLBACK - User in session:', req.user?.displayName);
-    console.log('🎯 AUTH CALLBACK - FRONTEND_URL env var:', process.env.FRONTEND_URL);
-    console.log('🎯 AUTH CALLBACK - Computed frontendUrl:', frontendUrl);
-    console.log('🎯 AUTH CALLBACK - Redirect URL will be:', `${frontendUrl}/auth/callback`);
-    
-    // 認証成功時のリダイレクト先
-    res.redirect(`${frontendUrl}/auth/callback`);
+app.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: `${frontendUrl}/login` }),
+  (req, res) => {
+    console.log('Google OAuth callback successful, redirecting to:', frontendUrl);
+    res.redirect(frontendUrl);
   }
 );
 
-// 認証状態確認
-app.get('/auth/status', (req: any, res) => {
-  console.log('AUTH STATUS CHECK:');
-  console.log('- Session ID:', req.sessionID);
-  console.log('- Session data:', req.session);
-  console.log('- isAuthenticated function exists:', typeof req.isAuthenticated);
-  console.log('- isAuthenticated result:', req.isAuthenticated ? req.isAuthenticated() : 'function not available');
-  console.log('- User data:', req.user);
-  console.log('- Cookie header:', req.headers.cookie);
-  
-  if (req.isAuthenticated && req.isAuthenticated()) {
-    res.json({ authenticated: true, user: req.user });
-  } else {
-    res.json({ authenticated: false });
-  }
+app.post('/auth/logout', (req: any, res) => {
+  req.logout((err: any) => {
+    if (err) {
+      console.error('Logout error:', err);
+      return res.status(500).json({ error: 'Logout failed' });
+    }
+    req.session.destroy((err: any) => {
+      if (err) {
+        console.error('Session destroy error:', err);
+        return res.status(500).json({ error: 'Session destroy failed' });
+      }
+      res.clearCookie('connect.sid');
+      res.json({ message: 'Logged out successfully' });
+    });
+  });
 });
 
-// ログアウト
-app.get('/auth/logout', (req: any, res) => {
-  if (req.logout) {
-    req.logout(() => {
-      res.json({ success: true });
-    });
-  } else {
-    res.json({ success: true });
-  }
+app.get('/auth/status', (req: any, res) => {
+  console.log('Auth status check:', {
+    isAuthenticated: req.isAuthenticated(),
+    user: req.user ? 'Present' : 'Not present',
+    sessionID: req.sessionID
+  });
+  
+  res.json({
+    authenticated: req.isAuthenticated(),
+    user: req.user || null
+  });
 });
 
 // Start server
