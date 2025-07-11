@@ -10,6 +10,7 @@ import allocationRatioRoutes from './routes/allocationRatioRoutes-postgres';
 import expenseRoutes from './routes/expenseRoutes-postgres';
 import settlementRoutes from './routes/settlementRoutes-postgres';
 
+
 // 環境変数の読み込み
 dotenv.config();
 
@@ -39,9 +40,9 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: { 
-    secure: !isDevelopment, // 本番環境では true に設定
+    secure: false, // 開発環境では false に設定
     httpOnly: true, // XSS攻撃を防ぐためにhttpOnlyを明示的に設定
-    sameSite: isDevelopment ? 'lax' : 'none', // 本番環境では none に設定（クロスサイトの場合）
+    sameSite: 'lax', // 開発環境では lax に設定
     maxAge: 24 * 60 * 60 * 1000 // 24時間
   }
 }));
