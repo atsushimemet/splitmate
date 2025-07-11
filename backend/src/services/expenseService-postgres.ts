@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
-import { pool } from '../database/connection-postgres';
+import pool from '../database/connection-postgres';
 import { ApiResponse, CreateExpenseRequest, Expense, MonthlyExpenseStats, MonthlyExpenseSummary, UpdateExpenseAllocationRatioRequest } from '../types';
-import { settlementService } from './settlementService-postgres';
+import { SettlementService } from './settlementService-postgres';
 
 export class ExpenseService {
   /**
@@ -46,12 +46,13 @@ export class ExpenseService {
       
       // 作成された費用を取得
       const result = await ExpenseService.getExpenseById(id);
+      
       if (result.success && result.data) {
-        // 費用作成後、精算を計算
+        // 費用作成後、精算を自動計算
         try {
-          await settlementService.calculateSettlement(id);
+          await SettlementService.calculateSettlement(id);
         } catch (error) {
-          console.error(`Error calculating settlement for new expense ${id}:`, error);
+          console.error(`Error calculating settlement for expense ${id}:`, error);
           // 精算の計算が失敗しても、費用の作成は成功として扱う
         }
         
@@ -83,7 +84,7 @@ export class ExpenseService {
         SELECT e.*, u.name as payer_name, u.role as payer_role
         FROM expenses e
         JOIN users u ON e.payer_id = u.id
-        ORDER BY e.expense_year DESC, e.expense_month DESC, e.created_at DESC
+        ORDER BY e.created_at DESC
       `;
       
       const result = await pool.query(sql);
@@ -99,7 +100,9 @@ export class ExpenseService {
         customWifeRatio: row.custom_wife_ratio,
         usesCustomRatio: row.uses_custom_ratio || false,
         createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at)
+        updatedAt: new Date(row.updated_at),
+        payerName: row.payer_name,
+        payerRole: row.payer_role
       }));
       
       return {
@@ -140,7 +143,9 @@ export class ExpenseService {
         customWifeRatio: row.custom_wife_ratio,
         usesCustomRatio: row.uses_custom_ratio || false,
         createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at)
+        updatedAt: new Date(row.updated_at),
+        payerName: row.payer_name,
+        payerRole: row.payer_role
       }));
       
       return {
@@ -150,7 +155,7 @@ export class ExpenseService {
     } catch (error) {
       return {
         success: false,
-        error: `Failed to fetch monthly expenses: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: `Failed to fetch expenses by month: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   }
@@ -160,28 +165,43 @@ export class ExpenseService {
    */
   static async getMonthlyExpenseSummary(year: number, month: number): Promise<ApiResponse<MonthlyExpenseSummary>> {
     try {
-      // 基本統計を取得
-      const basicStatsSql = `
+      const sql = `
         SELECT 
+          expense_year as year,
+          expense_month as month,
           COUNT(*) as total_expenses,
           SUM(amount) as total_amount,
-          SUM(CASE WHEN u.role = 'husband' THEN amount ELSE 0 END) as husband_amount,
-          SUM(CASE WHEN u.role = 'wife' THEN amount ELSE 0 END) as wife_amount
-        FROM expenses e
-        JOIN users u ON e.payer_id = u.id
-        WHERE e.expense_year = $1 AND e.expense_month = $2
+          SUM(CASE WHEN payer_id = 'husband' THEN amount ELSE 0 END) as husband_amount,
+          SUM(CASE WHEN payer_id = 'wife' THEN amount ELSE 0 END) as wife_amount
+        FROM expenses
+        WHERE expense_year = $1 AND expense_month = $2
+        GROUP BY expense_year, expense_month
       `;
       
-      const result = await pool.query(basicStatsSql, [year, month]);
-      const basicStats = result.rows[0];
+      const result = await pool.query(sql, [year, month]);
       
+      if (result.rows.length === 0) {
+        return {
+          success: true,
+          data: {
+            year,
+            month,
+            totalExpenses: 0,
+            totalAmount: 0,
+            husbandAmount: 0,
+            wifeAmount: 0
+          }
+        };
+      }
+      
+      const row = result.rows[0];
       const summary: MonthlyExpenseSummary = {
-        year,
-        month,
-        totalAmount: parseInt(basicStats.total_amount) || 0,
-        totalExpenses: parseInt(basicStats.total_expenses) || 0,
-        husbandAmount: parseInt(basicStats.husband_amount) || 0,
-        wifeAmount: parseInt(basicStats.wife_amount) || 0
+        year: row.year,
+        month: row.month,
+        totalExpenses: parseInt(row.total_expenses),
+        totalAmount: parseInt(row.total_amount),
+        husbandAmount: parseInt(row.husband_amount),
+        wifeAmount: parseInt(row.wife_amount)
       };
       
       return {
@@ -197,61 +217,55 @@ export class ExpenseService {
   }
 
   /**
-   * 月次費用統計情報を取得する
+   * 月次費用統計を取得する
    */
   static async getMonthlyExpenseStats(year?: number, month?: number): Promise<ApiResponse<MonthlyExpenseStats>> {
     try {
       const now = new Date();
-      const currentYear = year || now.getFullYear();
-      const currentMonth = month || (now.getMonth() + 1);
+      const targetYear = year || now.getFullYear();
+      const targetMonth = month || (now.getMonth() + 1);
       
-      // 前月の計算
-      let previousYear = currentYear;
-      let previousMonth = currentMonth - 1;
-      if (previousMonth === 0) {
-        previousMonth = 12;
-        previousYear = currentYear - 1;
-      }
+      // 当月の統計
+      const currentMonthResult = await ExpenseService.getMonthlyExpenseSummary(targetYear, targetMonth);
       
-      // 当月のサマリーを取得
-      const currentMonthResult = await ExpenseService.getMonthlyExpenseSummary(currentYear, currentMonth);
-      if (!currentMonthResult.success || !currentMonthResult.data) {
-        return {
-          success: false,
-          error: 'Failed to fetch current month summary'
-        };
-      }
+      // 前月の統計
+      const prevMonth = targetMonth === 1 ? 12 : targetMonth - 1;
+      const prevYear = targetMonth === 1 ? targetYear - 1 : targetYear;
+      const previousMonthResult = await ExpenseService.getMonthlyExpenseSummary(prevYear, prevMonth);
       
-      // 前月のサマリーを取得
-      const previousMonthResult = await ExpenseService.getMonthlyExpenseSummary(previousYear, previousMonth);
-      if (!previousMonthResult.success || !previousMonthResult.data) {
-        return {
-          success: false,
-          error: 'Failed to fetch previous month summary'
-        };
-      }
-      
-      // 年初からの統計を取得
-      const yearToDateSql = `
+      // 年間統計
+      const yearSql = `
         SELECT 
           COUNT(*) as total_expenses,
           SUM(amount) as total_amount
         FROM expenses
-        WHERE expense_year = $1 AND expense_month <= $2
+        WHERE expense_year = $1
       `;
       
-      const yearToDateResult = await pool.query(yearToDateSql, [currentYear, currentMonth]);
-      const yearToDateStats = yearToDateResult.rows[0];
-      
-      const monthlyAverages = currentMonth > 0 ? (parseInt(yearToDateStats.total_amount) || 0) / currentMonth : 0;
+      const yearResult = await pool.query(yearSql, [targetYear]);
+      const yearRow = yearResult.rows[0];
       
       const stats: MonthlyExpenseStats = {
-        currentMonth: currentMonthResult.data,
-        previousMonth: previousMonthResult.data,
+        currentMonth: currentMonthResult.data || {
+          year: targetYear,
+          month: targetMonth,
+          totalExpenses: 0,
+          totalAmount: 0,
+          husbandAmount: 0,
+          wifeAmount: 0
+        },
+        previousMonth: previousMonthResult.data || {
+          year: prevYear,
+          month: prevMonth,
+          totalExpenses: 0,
+          totalAmount: 0,
+          husbandAmount: 0,
+          wifeAmount: 0
+        },
         yearToDate: {
-          totalAmount: parseInt(yearToDateStats.total_amount) || 0,
-          totalExpenses: parseInt(yearToDateStats.total_expenses) || 0,
-          monthlyAverages: Math.round(monthlyAverages)
+          totalExpenses: parseInt(yearRow.total_expenses) || 0,
+          totalAmount: parseInt(yearRow.total_amount) || 0,
+          monthlyAverages: Math.round((parseInt(yearRow.total_amount) || 0) / 12)
         }
       };
       
@@ -280,15 +294,15 @@ export class ExpenseService {
       `;
       
       const result = await pool.query(sql, [id]);
-      const row = result.rows[0];
       
-      if (!row) {
+      if (result.rows.length === 0) {
         return {
           success: false,
           error: 'Expense not found'
         };
       }
       
+      const row = result.rows[0];
       const expense: Expense = {
         id: row.id,
         description: row.description,
@@ -300,7 +314,9 @@ export class ExpenseService {
         customWifeRatio: row.custom_wife_ratio,
         usesCustomRatio: row.uses_custom_ratio || false,
         createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at)
+        updatedAt: new Date(row.updated_at),
+        payerName: row.payer_name,
+        payerRole: row.payer_role
       };
       
       return {
@@ -321,11 +337,9 @@ export class ExpenseService {
   static async deleteExpense(id: string): Promise<ApiResponse<void>> {
     try {
       const sql = 'DELETE FROM expenses WHERE id = $1';
-      
       const result = await pool.query(sql, [id]);
-      const affectedRows = result.rowCount;
       
-      if (affectedRows === 0) {
+      if (result.rowCount === 0) {
         return {
           success: false,
           error: 'Expense not found'
@@ -377,7 +391,7 @@ export class ExpenseService {
   }
 
   /**
-   * 費用の統計情報を取得する
+   * 費用統計を取得する
    */
   static async getExpenseStats(): Promise<ApiResponse<any>> {
     try {
@@ -385,19 +399,23 @@ export class ExpenseService {
         SELECT 
           COUNT(*) as total_expenses,
           SUM(amount) as total_amount,
-          MIN(amount) as min_amount
+          AVG(amount) as average_amount,
+          MIN(amount) as min_amount,
+          MAX(amount) as max_amount
         FROM expenses
       `;
       
       const result = await pool.query(sql);
-      const row = result.rows[0];
+      const stats = result.rows[0];
       
       return {
         success: true,
         data: {
-          totalExpenses: parseInt(row.total_expenses),
-          totalAmount: parseInt(row.total_amount),
-          minAmount: parseInt(row.min_amount)
+          totalExpenses: parseInt(stats.total_expenses) || 0,
+          totalAmount: parseInt(stats.total_amount) || 0,
+          averageAmount: Math.round(parseFloat(stats.average_amount) || 0),
+          minAmount: parseInt(stats.min_amount) || 0,
+          maxAmount: parseInt(stats.max_amount) || 0
         }
       };
     } catch (error) {
@@ -443,7 +461,7 @@ export class ExpenseService {
       
       // 個別配分比率の更新後、該当する精算を再計算
       try {
-        await settlementService.calculateSettlement(expenseId);
+        await SettlementService.calculateSettlement(expenseId);
       } catch (error) {
         console.error(`Error recalculating settlement for expense ${expenseId}:`, error);
         // 精算の再計算が失敗しても、費用の更新は成功として扱う

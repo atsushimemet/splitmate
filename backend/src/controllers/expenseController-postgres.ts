@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { ExpenseService } from '../services/expenseService-postgres';
+import { UserService } from '../services/userService-postgres';
 
 // バリデーションスキーマ
 const createExpenseSchema = z.object({
@@ -9,10 +10,6 @@ const createExpenseSchema = z.object({
   payerId: z.string().min(1, 'Payer ID is required'),
   expenseYear: z.number().int().min(2020).max(2099).optional(),
   expenseMonth: z.number().int().min(1).max(12).optional()
-});
-
-const bulkDeleteExpenseSchema = z.object({
-  ids: z.array(z.string().min(1, 'Expense ID is required')).min(1, 'At least one expense ID is required')
 });
 
 const monthlyExpenseSchema = z.object({
@@ -30,10 +27,41 @@ const updateExpenseAllocationRatioSchema = z.object({
 
 export class ExpenseController {
   /**
+   * 利用可能なユーザー一覧を取得
+   */
+  static async getAvailableUsers(req: any, res: Response) {
+    try {
+      const result = await UserService.getAllUsers();
+      
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+      return;
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+      return;
+    }
+  }
+
+  /**
    * 新しい費用を登録
    */
-  static async createExpense(req: Request, res: Response) {
+  static async createExpense(req: any, res: Response) {
     try {
+      // 認証チェック
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required'
+        });
+      }
+
       const validationResult = createExpenseSchema.safeParse(req.body);
       
       if (!validationResult.success) {
@@ -44,6 +72,8 @@ export class ExpenseController {
         });
       }
 
+      // リクエストボディの payerId をそのまま使用
+      // （フロントエンドで選択された立替者: 'husband' または 'wife'）
       const result = await ExpenseService.createExpense(validationResult.data);
       
       if (result.success) {
@@ -113,42 +143,6 @@ export class ExpenseController {
       return;
     } catch (error) {
       console.error('Error fetching monthly expenses:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-      return;
-    }
-  }
-
-  /**
-   * 指定した年月の費用サマリーを取得
-   */
-  static async getMonthlyExpenseSummary(req: Request, res: Response) {
-    try {
-      const year = parseInt(req.params.year);
-      const month = parseInt(req.params.month);
-      
-      const validationResult = monthlyExpenseSchema.safeParse({ year, month });
-      
-      if (!validationResult.success) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid year or month',
-          details: validationResult.error.errors
-        });
-      }
-
-      const result = await ExpenseService.getMonthlyExpenseSummary(year, month);
-      
-      if (result.success) {
-        res.status(200).json(result);
-      } else {
-        res.status(400).json(result);
-      }
-      return;
-    } catch (error) {
-      console.error('Error fetching monthly expense summary:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error'
@@ -262,7 +256,7 @@ export class ExpenseController {
   }
 
   /**
-   * 費用の統計情報を取得
+   * 費用統計を取得
    */
   static async getExpenseStats(req: Request, res: Response) {
     try {
@@ -276,39 +270,6 @@ export class ExpenseController {
       return;
     } catch (error) {
       console.error('Error fetching expense stats:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-      return;
-    }
-  }
-
-  /**
-   * 複数の費用を一括削除
-   */
-  static async bulkDeleteExpenses(req: Request, res: Response) {
-    try {
-      const validationResult = bulkDeleteExpenseSchema.safeParse(req.body);
-      
-      if (!validationResult.success) {
-        return res.status(400).json({
-          success: false,
-          error: 'Validation failed',
-          details: validationResult.error.errors
-        });
-      }
-
-      const result = await ExpenseService.bulkDeleteExpenses(validationResult.data.ids);
-      
-      if (result.success) {
-        res.status(200).json(result);
-      } else {
-        res.status(400).json(result);
-      }
-      return;
-    } catch (error) {
-      console.error('Error bulk deleting expenses:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error'

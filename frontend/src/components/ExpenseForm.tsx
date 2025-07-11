@@ -14,8 +14,8 @@ export interface ExpenseFormHandle {
 
 
 const DEFAULT_USERS = [
-  { id: 'husband-001', name: '夫', role: 'husband' as const },
-  { id: 'wife-001', name: '妻', role: 'wife' as const }
+  { id: 'husband', name: '夫', role: 'husband' as const },
+  { id: 'wife', name: '妻', role: 'wife' as const }
 ];
 
 // 年月の選択肢を生成
@@ -57,7 +57,7 @@ const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit,
         return {
           description: parsedData.description || '',
           amount: 0, // 金額は常に0からスタート
-          payerId: parsedData.payerId || 'husband-001',
+          payerId: parsedData.payerId || 'husband',
           expenseYear: parsedData.expenseYear || currentYear,
           expenseMonth: parsedData.expenseMonth || currentMonth
         };
@@ -70,7 +70,7 @@ const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit,
     return {
       description: '',
       amount: 0,
-      payerId: 'husband-001',
+      payerId: 'husband',
       expenseYear: currentYear,
       expenseMonth: currentMonth
     };
@@ -105,7 +105,7 @@ const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit,
       const clearedData = {
         description: '',
         amount: 0,
-        payerId: 'husband-001',
+        payerId: 'husband',
         expenseYear: currentYear,
         expenseMonth: currentMonth
       };
@@ -139,7 +139,7 @@ const ExpenseForm = forwardRef<ExpenseFormHandle, ExpenseFormProps>(({ onSubmit,
     const clearedData = {
       description: '',
       amount: 0,
-      payerId: 'husband-001',
+      payerId: 'husband',
       expenseYear: currentYear,
       expenseMonth: currentMonth
     };

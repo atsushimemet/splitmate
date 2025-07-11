@@ -1,0 +1,28 @@
+# Use Node.js 22 Alpine for smaller image size
+FROM node:22-alpine
+
+# Install wget for health check
+RUN apk add --no-cache wget
+
+# Set working directory
+WORKDIR /app
+
+# Copy root package files
+COPY package.json package-lock.json ./
+# Copy backend package.json
+COPY backend/package.json ./backend/
+
+# Install all dependencies for backend workspace
+RUN npm ci --workspace=backend
+
+# Install tsx globally for TypeScript execution
+RUN npm install -g tsx
+
+# Copy backend source code
+COPY backend ./backend
+
+# Expose port
+EXPOSE 3001
+
+# Start the development server for PostgreSQL
+CMD ["npm", "run", "dev:postgres", "--workspace=backend"] 

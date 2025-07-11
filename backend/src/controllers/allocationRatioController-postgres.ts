@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { allocationRatioService } from '../services/allocationRatioService-postgres';
+import { AllocationRatioService } from '../services/allocationRatioService-postgres';
 
 // バリデーションスキーマ
 const updateAllocationRatioSchema = z.object({
@@ -12,16 +12,16 @@ const updateAllocationRatioSchema = z.object({
 
 export class AllocationRatioController {
   /**
-   * 配分比率を取得
+   * デフォルトの配分比率を取得
    */
-  static async getAllocationRatio(req: Request, res: Response) {
+  static async getDefaultAllocationRatio(req: Request, res: Response) {
     try {
-      const result = await allocationRatioService.getAllocationRatio();
+      const result = await AllocationRatioService.getDefaultAllocationRatio();
       
       if (result.success) {
         res.status(200).json(result);
       } else {
-        res.status(400).json(result);
+        res.status(404).json(result);
       }
       return;
     } catch (error) {
@@ -35,9 +35,9 @@ export class AllocationRatioController {
   }
 
   /**
-   * 配分比率を更新
+   * デフォルトの配分比率を更新
    */
-  static async updateAllocationRatio(req: Request, res: Response) {
+  static async updateDefaultAllocationRatio(req: Request, res: Response) {
     try {
       const validationResult = updateAllocationRatioSchema.safeParse(req.body);
       
@@ -49,7 +49,7 @@ export class AllocationRatioController {
         });
       }
 
-      const result = await allocationRatioService.updateAllocationRatio(validationResult.data);
+      const result = await AllocationRatioService.updateDefaultAllocationRatio(validationResult.data);
       
       if (result.success) {
         res.status(200).json(result);

@@ -1,18 +1,18 @@
-import { pool } from '../database/connection-postgres';
+import pool from '../database/connection-postgres';
 import { ApiResponse, Settlement } from '../types';
-import { allocationRatioService } from './allocationRatioService-postgres';
+import { AllocationRatioService } from './allocationRatioService-postgres';
 
-export const settlementService = {
-  // 費用の精算を計算
-  calculateSettlement: async (expenseId: string): Promise<ApiResponse<Settlement>> => {
+export class SettlementService {
+  /**
+   * 費用の精算を計算
+   */
+  static async calculateSettlement(expenseId: string): Promise<ApiResponse<Settlement>> {
     try {
       // 費用を取得（個別配分比率を含む）
       const expenseQuery = `
-        SELECT id, description, amount, payer_id as "payerId",
-               custom_husband_ratio as "customHusbandRatio",
-               custom_wife_ratio as "customWifeRatio",
-               uses_custom_ratio as "usesCustomRatio",
-               created_at as "createdAt", updated_at as "updatedAt"
+        SELECT id, description, amount, payer_id,
+               custom_husband_ratio, custom_wife_ratio, uses_custom_ratio,
+               created_at, updated_at
         FROM expenses 
         WHERE id = $1
       `;
@@ -23,7 +23,7 @@ export const settlementService = {
       if (!expense) {
         return {
           success: false,
-          error: '費用が見つかりません'
+          error: 'Expense not found'
         };
       }
 
@@ -31,17 +31,17 @@ export const settlementService = {
       let husbandRatio: number;
       let wifeRatio: number;
 
-      if (expense.usesCustomRatio && expense.customHusbandRatio !== null && expense.customWifeRatio !== null) {
+      if (expense.uses_custom_ratio && expense.custom_husband_ratio !== null && expense.custom_wife_ratio !== null) {
         // 個別配分比率を使用
-        husbandRatio = parseFloat(expense.customHusbandRatio);
-        wifeRatio = parseFloat(expense.customWifeRatio);
+        husbandRatio = parseFloat(expense.custom_husband_ratio);
+        wifeRatio = parseFloat(expense.custom_wife_ratio);
       } else {
         // 全体配分比率を取得
-        const ratioResponse = await allocationRatioService.getAllocationRatio();
+        const ratioResponse = await AllocationRatioService.getDefaultAllocationRatio();
         if (!ratioResponse.success || !ratioResponse.data) {
           return {
             success: false,
-            error: '配分比率の取得に失敗しました'
+            error: 'Failed to get allocation ratio'
           };
         }
         husbandRatio = ratioResponse.data.husbandRatio;
@@ -52,22 +52,22 @@ export const settlementService = {
       const husbandAmount = Math.round(expense.amount * husbandRatio);
       const wifeAmount = Math.round(expense.amount * wifeRatio);
       
-      // 支払者を取得（入力者から）
+      // 支払者を取得
       const userQuery = `
         SELECT role FROM users WHERE id = $1
       `;
       
-      const userResult = await pool.query(userQuery, [expense.payerId]);
+      const userResult = await pool.query(userQuery, [expense.payer_id]);
       const user = userResult.rows[0];
 
       if (!user) {
         return {
           success: false,
-          error: '支払者の情報が見つかりません'
+          error: 'Payer not found'
         };
       }
 
-      // 立替者と受取者を決定（入力者が立替者）
+      // 立替者と受取者を決定
       const payer = user.role; // 'husband' または 'wife'
       const receiver = payer === 'husband' ? 'wife' : 'husband';
       
@@ -81,7 +81,7 @@ export const settlementService = {
       const upsertQuery = `
         INSERT INTO settlements 
         (id, expense_id, husband_amount, wife_amount, payer, receiver, settlement_amount, status, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9)
         ON CONFLICT (id) DO UPDATE SET
         husband_amount = EXCLUDED.husband_amount,
         wife_amount = EXCLUDED.wife_amount,
@@ -89,12 +89,11 @@ export const settlementService = {
         receiver = EXCLUDED.receiver,
         settlement_amount = EXCLUDED.settlement_amount,
         status = EXCLUDED.status,
-        updated_at = CURRENT_TIMESTAMP
-        RETURNING id, expense_id as "expenseId", husband_amount as "husbandAmount", wife_amount as "wifeAmount",
-                  payer, receiver, settlement_amount as "settlementAmount", status,
-                  created_at as "createdAt", updated_at as "updatedAt"
+        updated_at = EXCLUDED.updated_at
+        RETURNING *
       `;
       
+      const now = new Date();
       const result = await pool.query(upsertQuery, [
         settlementId,
         expenseId,
@@ -102,199 +101,78 @@ export const settlementService = {
         wifeAmount,
         payer,
         receiver,
-        settlementAmount
+        settlementAmount,
+        now,
+        now
       ]);
 
       const settlementRow = result.rows[0];
 
-      return {
-        success: true,
-        data: {
-          id: settlementRow.id,
-          expenseId: settlementRow.expenseId,
-          husbandAmount: settlementRow.husbandAmount,
-          wifeAmount: settlementRow.wifeAmount,
-          payer: settlementRow.payer,
-          receiver: settlementRow.receiver,
-          settlementAmount: settlementRow.settlementAmount,
-          status: settlementRow.status,
-          createdAt: new Date(settlementRow.createdAt),
-          updatedAt: new Date(settlementRow.updatedAt),
-          expenseDescription: expense.description,
-          expenseAmount: expense.amount,
-          customHusbandRatio: expense.customHusbandRatio ? parseFloat(expense.customHusbandRatio) : null,
-          customWifeRatio: expense.customWifeRatio ? parseFloat(expense.customWifeRatio) : null,
-          usesCustomRatio: expense.usesCustomRatio || false
-        }
+      const settlement: Settlement = {
+        id: settlementRow.id,
+        expenseId: settlementRow.expense_id,
+        husbandAmount: settlementRow.husband_amount,
+        wifeAmount: settlementRow.wife_amount,
+        payer: settlementRow.payer,
+        receiver: settlementRow.receiver,
+        settlementAmount: settlementRow.settlement_amount,
+        status: settlementRow.status,
+        createdAt: new Date(settlementRow.created_at),
+        updatedAt: new Date(settlementRow.updated_at),
+        expenseDescription: expense.description,
+        expenseAmount: expense.amount,
+        customHusbandRatio: expense.custom_husband_ratio ? parseFloat(expense.custom_husband_ratio) : null,
+        customWifeRatio: expense.custom_wife_ratio ? parseFloat(expense.custom_wife_ratio) : null,
+        usesCustomRatio: expense.uses_custom_ratio || false
       };
-    } catch (error) {
-      console.error('Error calculating settlement:', error);
-      return {
-        success: false,
-        error: '精算計算に失敗しました'
-      };
-    }
-  },
-
-  // 精算を承認
-  approveSettlement: async (settlementId: string): Promise<ApiResponse<Settlement>> => {
-    try {
-      const updateQuery = `
-        UPDATE settlements 
-        SET status = 'approved', updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-      `;
-      
-      await pool.query(updateQuery, [settlementId]);
-
-      // 更新された精算を取得
-      const getQuery = `
-        SELECT s.id, s.expense_id as "expenseId", s.husband_amount as "husbandAmount", 
-               s.wife_amount as "wifeAmount", s.payer, s.receiver, s.settlement_amount as "settlementAmount",
-               s.status, s.created_at as "createdAt", s.updated_at as "updatedAt",
-               e.description as "expenseDescription", e.amount as "expenseAmount",
-               e.custom_husband_ratio as "customHusbandRatio", e.custom_wife_ratio as "customWifeRatio",
-               e.uses_custom_ratio as "usesCustomRatio"
-        FROM settlements s
-        JOIN expenses e ON s.expense_id = e.id
-        WHERE s.id = $1
-      `;
-      
-      const result = await pool.query(getQuery, [settlementId]);
-      const row = result.rows[0];
-
-      if (!row) {
-        return {
-          success: false,
-          error: '精算が見つかりません'
-        };
-      }
 
       return {
         success: true,
-        data: {
-          id: row.id,
-          expenseId: row.expenseId,
-          husbandAmount: row.husbandAmount,
-          wifeAmount: row.wifeAmount,
-          payer: row.payer,
-          receiver: row.receiver,
-          settlementAmount: row.settlementAmount,
-          status: row.status,
-          createdAt: new Date(row.createdAt),
-          updatedAt: new Date(row.updatedAt),
-          expenseDescription: row.expenseDescription,
-          expenseAmount: row.expenseAmount,
-          customHusbandRatio: row.customHusbandRatio ? parseFloat(row.customHusbandRatio) : null,
-          customWifeRatio: row.customWifeRatio ? parseFloat(row.customWifeRatio) : null,
-          usesCustomRatio: row.usesCustomRatio || false
-        }
+        data: settlement
       };
     } catch (error) {
-      console.error('Error approving settlement:', error);
       return {
         success: false,
-        error: '精算の承認に失敗しました'
+        error: `Failed to calculate settlement: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
-  },
+  }
 
-  // 精算を完了
-  completeSettlement: async (settlementId: string): Promise<ApiResponse<Settlement>> => {
+  /**
+   * 全ての精算を取得する
+   */
+  static async getAllSettlements(): Promise<ApiResponse<Settlement[]>> {
     try {
-      const updateQuery = `
-        UPDATE settlements 
-        SET status = 'completed', updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-      `;
-      
-      await pool.query(updateQuery, [settlementId]);
-
-      // 更新された精算を取得
-      const getQuery = `
-        SELECT s.id, s.expense_id as "expenseId", s.husband_amount as "husbandAmount", 
-               s.wife_amount as "wifeAmount", s.payer, s.receiver, s.settlement_amount as "settlementAmount",
-               s.status, s.created_at as "createdAt", s.updated_at as "updatedAt",
-               e.description as "expenseDescription", e.amount as "expenseAmount",
-               e.custom_husband_ratio as "customHusbandRatio", e.custom_wife_ratio as "customWifeRatio",
-               e.uses_custom_ratio as "usesCustomRatio"
-        FROM settlements s
-        JOIN expenses e ON s.expense_id = e.id
-        WHERE s.id = $1
-      `;
-      
-      const result = await pool.query(getQuery, [settlementId]);
-      const row = result.rows[0];
-
-      if (!row) {
-        return {
-          success: false,
-          error: '精算が見つかりません'
-        };
-      }
-
-      return {
-        success: true,
-        data: {
-          id: row.id,
-          expenseId: row.expenseId,
-          husbandAmount: row.husbandAmount,
-          wifeAmount: row.wifeAmount,
-          payer: row.payer,
-          receiver: row.receiver,
-          settlementAmount: row.settlementAmount,
-          status: row.status,
-          createdAt: new Date(row.createdAt),
-          updatedAt: new Date(row.updatedAt),
-          expenseDescription: row.expenseDescription,
-          expenseAmount: row.expenseAmount,
-          customHusbandRatio: row.customHusbandRatio ? parseFloat(row.customHusbandRatio) : null,
-          customWifeRatio: row.customWifeRatio ? parseFloat(row.customWifeRatio) : null,
-          usesCustomRatio: row.usesCustomRatio || false
-        }
-      };
-    } catch (error) {
-      console.error('Error completing settlement:', error);
-      return {
-        success: false,
-        error: '精算の完了に失敗しました'
-      };
-    }
-  },
-
-  // 全ての精算を取得
-  getAllSettlements: async (): Promise<ApiResponse<Settlement[]>> => {
-    try {
-      const query = `
-        SELECT s.id, s.expense_id as "expenseId", s.husband_amount as "husbandAmount",
-               s.wife_amount as "wifeAmount", s.payer, s.receiver, s.settlement_amount as "settlementAmount",
-               s.status, s.created_at as "createdAt", s.updated_at as "updatedAt",
-               e.description as "expenseDescription", e.amount as "expenseAmount",
-               e.custom_husband_ratio as "customHusbandRatio", e.custom_wife_ratio as "customWifeRatio",
-               e.uses_custom_ratio as "usesCustomRatio"
+      const sql = `
+        SELECT s.*, 
+               e.description as expense_description, 
+               e.amount as expense_amount,
+               e.custom_husband_ratio,
+               e.custom_wife_ratio,
+               e.uses_custom_ratio
         FROM settlements s
         JOIN expenses e ON s.expense_id = e.id
         ORDER BY s.created_at DESC
       `;
       
-      const result = await pool.query(query);
+      const result = await pool.query(sql);
       
       const settlements: Settlement[] = result.rows.map((row: any) => ({
         id: row.id,
-        expenseId: row.expenseId,
-        husbandAmount: row.husbandAmount,
-        wifeAmount: row.wifeAmount,
+        expenseId: row.expense_id,
+        husbandAmount: row.husband_amount,
+        wifeAmount: row.wife_amount,
         payer: row.payer,
         receiver: row.receiver,
-        settlementAmount: row.settlementAmount,
+        settlementAmount: row.settlement_amount,
         status: row.status,
-        createdAt: new Date(row.createdAt),
-        updatedAt: new Date(row.updatedAt),
-        expenseDescription: row.expenseDescription,
-        expenseAmount: row.expenseAmount,
-        customHusbandRatio: row.customHusbandRatio ? parseFloat(row.customHusbandRatio) : null,
-        customWifeRatio: row.customWifeRatio ? parseFloat(row.customWifeRatio) : null,
-        usesCustomRatio: row.usesCustomRatio || false
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        expenseDescription: row.expense_description,
+        expenseAmount: row.expense_amount,
+        customHusbandRatio: row.custom_husband_ratio ? parseFloat(row.custom_husband_ratio) : null,
+        customWifeRatio: row.custom_wife_ratio ? parseFloat(row.custom_wife_ratio) : null,
+        usesCustomRatio: row.uses_custom_ratio || false
       }));
       
       return {
@@ -302,39 +180,61 @@ export const settlementService = {
         data: settlements
       };
     } catch (error) {
-      console.error('Error getting settlements:', error);
       return {
         success: false,
-        error: '精算の取得に失敗しました'
-      };
-    }
-  },
-
-  // 精算を削除
-  deleteSettlement: async (settlementId: string): Promise<ApiResponse<void>> => {
-    try {
-      const query = 'DELETE FROM settlements WHERE id = $1';
-      
-      const result = await pool.query(query, [settlementId]);
-      const affectedRows = result.rowCount;
-      
-      if (affectedRows === 0) {
-        return {
-          success: false,
-          error: '精算が見つかりません'
-        };
-      }
-      
-      return {
-        success: true,
-        message: '精算を削除しました'
-      };
-    } catch (error) {
-      console.error('Error deleting settlement:', error);
-      return {
-        success: false,
-        error: '精算の削除に失敗しました'
+        error: `Failed to fetch settlements: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   }
-}; 
+
+  /**
+   * 精算のステータスを更新する
+   */
+  static async updateSettlementStatus(id: string, status: 'pending' | 'approved' | 'completed'): Promise<ApiResponse<Settlement>> {
+    try {
+      const sql = `
+        UPDATE settlements 
+        SET status = $1, updated_at = $2
+        WHERE id = $3
+        RETURNING *
+      `;
+      
+      const result = await pool.query(sql, [status, new Date(), id]);
+      
+      if (result.rows.length === 0) {
+        return {
+          success: false,
+          error: 'Settlement not found'
+        };
+      }
+      
+      const row = result.rows[0];
+      const settlement: Settlement = {
+        id: row.id,
+        expenseId: row.expense_id,
+        husbandAmount: row.husband_amount,
+        wifeAmount: row.wife_amount,
+        payer: row.payer,
+        receiver: row.receiver,
+        settlementAmount: row.settlement_amount,
+        status: row.status,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        customHusbandRatio: row.custom_husband_ratio,
+        customWifeRatio: row.custom_wife_ratio,
+        usesCustomRatio: row.uses_custom_ratio || false
+      };
+      
+      return {
+        success: true,
+        data: settlement,
+        message: 'Settlement status updated successfully'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to update settlement status: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+} 

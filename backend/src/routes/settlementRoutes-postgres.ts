@@ -1,13 +1,13 @@
-import { Router } from 'express';
+import express from 'express';
 import { SettlementController } from '../controllers/settlementController-postgres';
 
-const router = Router();
+const router = express.Router();
 
 // 精算関連のルート
 router.post('/calculate/:expenseId', SettlementController.calculateSettlement);
+router.get('/', SettlementController.getAllSettlements);
 router.put('/:settlementId/approve', SettlementController.approveSettlement);
 router.put('/:settlementId/complete', SettlementController.completeSettlement);
-router.get('/', SettlementController.getAllSettlements);
-router.delete('/:settlementId', SettlementController.deleteSettlement);
+router.put('/:id/status', SettlementController.updateSettlementStatus);
 
 export default router; 
