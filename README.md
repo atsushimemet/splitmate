@@ -1,5 +1,18 @@
-# What is splitmate?
+# SplitMate
+
 Household Expense Settlement System.
+
+## 📚 Important Documents
+
+**⚠️ Project Currently Suspended - For Future Resumption:**
+- 🚀 **[Project Resume Guide](docs/project-resume-guide.md)** - Complete guide for restarting the project
+- ⚡ **[Quick Reference](docs/quick-reference.md)** - Essential commands and shortcuts
+- 🔧 **[AWS Resource Management](docs/aws-resource-bulk-management.md)** - AWS infrastructure management
+- 📋 **[AWS Resource Checklist](docs/aws-resource-management-checklist.md)** - Manual verification procedures
+
+---
+
+## What is splitmate?
 This document is requirements document.
 
 ## Purpose
